@@ -1,23 +1,38 @@
+import { HomeTab } from "../views/Tabs/HomeTab";
+import { ShopCartTab } from "../views/Tabs/ShopCartTab";
+
 @Entry
-@Component
+@ComponentV2
 struct Index {
-  @State message: string = 'Hello World';
+  @Provider('pageStack')
+  pageStack: NavPathStack = new NavPathStack();
+  @Builder
+  PagesMap(name: string) {
+
+  }
 
   build() {
-    RelativeContainer() {
-      Text(this.message)
-        .id('HelloWorld')
-        .fontSize($r('app.float.page_text_font_size'))
-        .fontWeight(FontWeight.Bold)
-        .alignRules({
-          center: { anchor: '__container__', align: VerticalAlign.Center },
-          middle: { anchor: '__container__', align: HorizontalAlign.Center }
-        })
-        .onClick(() => {
-          this.message = 'Welcome';
-        })
+    Navigation(this.pageStack) {
+      Tabs() {
+        TabContent() {
+          HomeTab();
+        }
+          .tabBar("首页")
+        TabContent()
+          .tabBar("分类")
+        TabContent()
+          .tabBar("消息")
+        TabContent() {
+          ShopCartTab();
+        }
+          .tabBar("购物车")
+        TabContent()
+          .tabBar("个人中心")
+      }
+      .barPosition(BarPosition.End)
     }
-    .height('100%')
-    .width('100%')
+    .mode(NavigationMode.Stack)
+    .hideToolBar(true)
+    .navDestination(this.PagesMap)
   }
 }

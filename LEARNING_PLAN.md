@@ -613,11 +613,121 @@
 **标签**：#状态管理 #ComponentV2
 ```
 
+### 2026-05-02 ForEach keyGenerator 导致只渲染一项
+
+**现象**：使用 `WaterFlow` + `ForEach` 渲染商品列表，数据源有 3 个商品，页面只显示最后一个。
+
+**排查过程**：
+1. 检查 `goodsList` 数据，确认 3 条数据已正确填充。
+2. 检查 `ForEach` 的 `itemGenerator`，确认语法无误。
+3. 锁定 `keyGenerator`：`(item) => item.toString()`。
+4. 打印日志发现所有对象都返回 `"[object Object]"`。
+
+**根因**：`ForEach` 依赖 key 追踪列表项。`GoodsItem` 未重写 `toString()`，所有对象 key 相同，ArkUI 认为它们是同一项，只保留最后一次渲染。
+
+**解法**：给 `GoodsItem` 加 `id` 字段，keyGenerator 改用 `(item) => item.id`。
+
+**标签**：#ForEach #列表渲染
+
+---
+
+### 2026-05-02 Button 小尺寸时文字不显示
+
+**现象**：商品详情卡片中 28×28 的加减按钮只显示灰色背景，`+` / `-` 文字完全看不到。
+
+**排查过程**：
+1. 确认 `.fontColor(Color.White)` 和 `.backgroundColor(Color.Gray)` 已设置。
+2. 尝试验证是否 Button 不支持 `.fontColor()`，换成 `Text` 组件正常显示。
+3. 对比 `Text` 和 `Button` 的差异，发现 Button 有默认内边距。
+
+**根因**：`Button` 默认有内边距（约 4-8vp），28×28 的按钮去掉内边距后文字区域所剩无几，被挤压到不可见。
+
+**解法**：给 `Button` 加 `.padding(0)`，去掉默认内边距即可正常显示文字。
+
+**标签**：#Button #样式
+
+---
+
+### 2026-05-03 Checkbox 闪烁 + 全选无效：`!!` 双向绑定与 `@Computed` 追踪链失效
+
+**现象**：
+1. 购物车列表项 Checkbox 点击后闪烁（选中→取消→选中来回跳）
+2. 底部"全选"Checkbox 点击后无反应，无法选中
+3. 底部统计数据（已选件数、总价）不随 Checkbox 变化更新
+
+**排查过程**：
+1. 先怀疑 `!!` + `onChange` 同时存在导致冲突，去掉 `!!` 后单列表勾选仍有问题。
+2. 检查全选逻辑，确认 `allCheckedChange` 正确设置了每个 item 的 `checked`，但 UI 不更新。
+3. 定位到统计栏用的 `@Computed` 依赖链问题：`@Computed` 中读 `this.cartViewModel.cartItemList` → 数组迭代 → 元素 `@Trace checked`。
+4. 发现回调中用了裸 `cartViewModel`（模块 import）而非 `this.cartViewModel`（`@Local` 代理），`@Computed` 的依赖追踪与实际写入路径不一致。
+5. 最终确认 V2 当前版本中 `@Computed` 通过 `@Local` → `@ObservedV2.@Trace` 数组 → 数组元素 `@Trace` 属性的深层链式追踪不可靠。
+
+**根因**：
+- **Bug 1**：`Checkbox.select(checked!!)` + `.onChange(() => checked = !checked)` 同存。`!!` 双向绑定自动切换一次，`onChange` 又手动切换一次，两次写入方向相反导致闪烁。
+- **Bug 2**：`@Computed` 依赖链太长。`@Computed get isAllChecked()` 依赖 `@Local cartViewModel` → `@Trace cartItemList` 数组引用 → 数组元素 `@Trace checked`。当通过 CartViewModel 方法修改 `item.checked` 并替换 `cartItemList = [...cartItemList]` 时，`@Computed` 未能被正确触发重计算。回调中混用裸 import 和 `this.` 加剧了追踪不一致。
+
+**解法**：
+不再依赖 `@Computed` 做深层派生，改为在 ViewModel 上显式管理派生状态：
+
+1. `CartViewModel` 加 `@Trace isAllChecked`、`@Trace buyCount`、`@Trace totalPrice` 三个一等字段。
+2. 创建 `private refreshDerived()` 方法，在所有突变（add/remove/decrease/checked change）末尾手动更新这三个值。
+3. `ShopCartTab` 删掉所有 `@Computed` / `@Monitor`，直接从 `this.cartViewModel.xxx` 读 `@Trace` 值。
+4. Checkbox 二选一：要么 `!!` 不要 `onChange`，要么 `select(checked)` + `onChange(value)` 不要 `!!`。
+
+**经验**：V2 的 `@Computed` 适合单层依赖（同组件内的 `@Local`/`@Param`）。跨 `@ObservedV2` + `@Trace` 数组的深层追踪不可靠时，宁愿在 ViewModel 上显式维护派生状态——可预测性 > 声明式优雅。
+
+**标签**：#状态管理 #ComponentV2 #@Computed #Checkbox
+
+---
+
+### 2026-05-03 @Param 简单类型在子组件中不刷新（V2 框架边缘 Bug）
+
+**现象**：
+购物车底部统计栏中，`buyCount` 能正常更新显示，但 `totalPrice` 始终显示 0。两者都为 `@Local` → `@Param` 传递的 number 类型，赋值路径完全一致。
+
+**排查过程**（多轮实验）：
+1. 确认 ViewModel 中 `refreshDerived()` 计算正确（console 日志验证 buyCount=1, totalPrice=5999）
+2. 改用 `@Monitor` 拷贝 ViewModel 值到组件 `@Local` → `@Monitor` 读到正确值但 `build()` 不重执行 → 确认 `@Monitor` 不触发重渲染
+3. 事件回调中内联赋值 `@Local` → 不生效
+4. **硬编码实验**：回调中直接 `this.totalPrice = 8888` → 仍不显示 → 排除 ViewModel 读值问题
+5. **合并 Button 实验**：`Button(\`结算(${buyCount}) ￥${totalAmount}\`)` → 两个值都正确显示 ✅
+6. **分离 Text 实验**：`Text(\`￥${totalAmount}\`)` → 总显示 0 ❌
+7. **@Computed 实验**：子组件中用 `@Computed` 生成字符串 → 也不生效 ❌
+8. **参数重命名**：`money` → `totalAmount`，加默认值 `= 0` → 无效
+
+**根因**：
+**V2 状态管理存在已知的不稳定因素（官方声明"still under development"）。子组件中 `@Param` 简单类型在不同 UI 组件中的响应不一致**——Button 对 `@Param` 变化的检测比 Text 更可靠。
+
+官方文档明确指出：
+> "using @Event to change the value of the parent component takes effect immediately. However, the process of synchronizing the change from the parent component to the child component is **asynchronous**."
+
+事件回调中修改父组件 `@Local` → 子组件 `@Param` 的同步是异步的，同一渲染帧内可能还未完成。
+
+同时：**子组件（`@ComponentV2`）中的 `@Computed` 不追踪 `@Param` 变化**——`@Computed` 设计上用于追踪 `@Local` 和 `@Trace`，官方从不在子组件中使用 `@Computed`。
+
+**解法**（两种可选）：
+1. **父组件 @Computed 格式化**：在父组件（有 `@Local` 可直接追踪）中用 `@Computed` 把值拼接成字符串，子组件只接收和展示最终字符串。
+2. **显示合并**：把多个 `@Param` 值放在同一个 Button/UI 元素中展示，利用能刷新的那个值拖拽另一个一起更新。
+
+**教训**：
+- V2 仍为试用版，遇到违反直觉的行为不要只怀疑自己代码——可能是框架限制。
+- `@Computed` 放在**数据源所在组件**（有 `@Local`），不放在子组件。
+- `@Monitor` 可用作调试工具（验证值是否正确同步），但不能依赖它触发 UI 重渲染。
+- 排查 `@Param` 不刷新问题时，用硬编码值对照实验可快速排除干扰因素。
+- 子组件尽量保持"纯展示"：父组件做数据格式化，子组件只接收最终结果。
+
+**标签**：#状态管理 #@Param #V2边缘Bug #异步同步
+
+---
+
 ### 踩坑列表
 
-| 序号 | 日期       | 问题     | 标签         | 阶段   |
-| ---- | ---------- | -------- | ------------ | ------ |
-| 1    | —          | —        | —            | —      |
+| 序号 | 日期       | 问题                           | 标签              | 阶段 |
+| ---- | ---------- | ------------------------------ | ----------------- | ---- |
+| 1    | 2026-05-02 | ForEach key 相同导致只渲染一项  | ForEach;KeyGenerator | 1    |
+| 2    | 2026-05-02 | Button 小尺寸文字不可见         | Button;样式           | 1    |
+| 3    | 2026-05-03 | Checkbox 闪烁 + 全选无效        | 状态管理;@Computed;Checkbox | 1    |
+| 4    | 2026-05-03 | @Param 数字在 Text 中不刷新     | @Param;异步同步;V2边缘Bug | 1    |
 
 ---
 
