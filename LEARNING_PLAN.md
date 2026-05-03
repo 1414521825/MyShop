@@ -696,27 +696,23 @@
 8. **参数重命名**：`money` → `totalAmount`，加默认值 `= 0` → 无效
 
 **根因**：
-**V2 状态管理存在已知的不稳定因素（官方声明"still under development"）。子组件中 `@Param` 简单类型在不同 UI 组件中的响应不一致**——Button 对 `@Param` 变化的检测比 Text 更可靠。
+**三层条件叠加**才触发此 Bug：`@ComponentV2`（非 @Entry）+ `TabContent` 包裹 + `Stack` 内嵌的子组件中 `Text` 对 `@Param` 不响应。任一条件不满足，Text 均能正常更新。
 
-官方文档明确指出：
-> "using @Event to change the value of the parent component takes effect immediately. However, the process of synchronizing the change from the parent component to the child component is **asynchronous**."
+最终实验验证：
+- 最简 `@Entry` + `@Local` → `@Param` → Text → ✅ 正常
+- `@ComponentV2` + TabContent + Stack → Text → ❌ 不更新
+- 同层级 `Button` 始终正常更新（Button 内部渲染管线不同）
 
-事件回调中修改父组件 `@Local` → 子组件 `@Param` 的同步是异步的，同一渲染帧内可能还未完成。
+**NOT**：不是 `@ObservedV2` 跨代理问题、不是模板字符串问题、不是 `.toString()` 问题、不是 `@Provider/@Consumer` 回调上下文问题、不是 `layoutWeight` 布局约束问题。
 
-同时：**子组件（`@ComponentV2`）中的 `@Computed` 不追踪 `@Param` 变化**——`@Computed` 设计上用于追踪 `@Local` 和 `@Trace`，官方从不在子组件中使用 `@Computed`。
-
-**解法**（两种可选）：
-1. **父组件 @Computed 格式化**：在父组件（有 `@Local` 可直接追踪）中用 `@Computed` 把值拼接成字符串，子组件只接收和展示最终字符串。
-2. **显示合并**：把多个 `@Param` 值放在同一个 Button/UI 元素中展示，利用能刷新的那个值拖拽另一个一起更新。
+**解法**：
+将 `totalAmount` 和 `buyCount` 合并到同一个 `Button` 中展示（Button 在上述三层条件下不受影响）。
 
 **教训**：
-- V2 仍为试用版，遇到违反直觉的行为不要只怀疑自己代码——可能是框架限制。
-- `@Computed` 放在**数据源所在组件**（有 `@Local`），不放在子组件。
-- `@Monitor` 可用作调试工具（验证值是否正确同步），但不能依赖它触发 UI 重渲染。
-- 排查 `@Param` 不刷新问题时，用硬编码值对照实验可快速排除干扰因素。
-- 子组件尽量保持"纯展示"：父组件做数据格式化，子组件只接收最终结果。
+- 用**对照实验**逐层排除变量：硬编码值排除读值问题 → `@Entry` 最简测试排除框架 bug → 逐步加回 TabContent/Stack 定位条件组合。
+- 排查方向不要停留在推测，每一步用实验结论驱动下一步。
 
-**标签**：#状态管理 #@Param #V2边缘Bug #异步同步
+**标签**：#Text #@Param #TabContent #V2渲染缺陷
 
 ---
 
@@ -727,8 +723,21 @@
 | 1    | 2026-05-02 | ForEach key 相同导致只渲染一项  | ForEach;KeyGenerator | 1    |
 | 2    | 2026-05-02 | Button 小尺寸文字不可见         | Button;样式           | 1    |
 | 3    | 2026-05-03 | Checkbox 闪烁 + 全选无效        | 状态管理;@Computed;Checkbox | 1    |
-| 4    | 2026-05-03 | @Param 数字在 Text 中不刷新     | @Param;异步同步;V2边缘Bug | 1    |
+| 4    | 2026-05-03 | Text 在 TabContent+Stack 中对 @Param 不响应 | Text;@Param;TabContent;渲染缺陷 | 1    |
+| 5    | 2026-05-04 | 布局约束未解时 V2 跳过组件内容更新 | layoutWeight;SpaceBetween;内容跳过 | 1    |
 
 ---
+
+### 2026-05-04 布局约束未解时 V2 跳过组件内容更新
+
+**现象**：
+`Button` 在外层 `Row(justifyContent: SpaceBetween)` 中使用 `.layoutWeight(1)` 时，按钮内容（模板字符串中的 buyCount 和 totalAmount）全部显示 0。换 `.width(240)` 后正常。
+
+**根因**：
+V2 中 `SpaceBetween` 布局需要先确定各子元素宽度再分配间距。子元素使用 `layoutWeight(1)` 时形成循环依赖——SpaceBetween 需要知道 Button 宽度才能布局，但 layoutWeight 需要知道可用空间才能计算宽度。V2 无法解决这一约束冲突，导致 Button 有效渲染宽度为 0，框架跳过内容更新。
+
+**解法**：在 `SpaceBetween` 父容器中，子元素使用固定 `.width()` 替代 `.layoutWeight()`。
+
+**标签**：#layoutWeight #SpaceBetween #布局约束冲突
 
 > 最后更新：2026-04-28

@@ -67,14 +67,8 @@ export class CartViewModel {
       .reduce((sum, item) => item.checked ? sum + item.count : sum, 0);
     this.isAllChecked = this.cartItemList.length > 0
       && this.cartItemList.every(item => item.checked);
-    this.cartItemList.forEach(item => {
-      console.log(`商品名称：${item.goods.goodsName};商品数量：${item.goods.goodsPrice};商品数量：${item.count};商品状态:${item.checked}`)
-    })
     this.totalPrice = this.cartItemList
       .reduce((sum, item) => item.checked ? sum + item.count * item.goods.goodsPrice : sum, 0);
-    console.log('>>> CartViewModel.refreshDerived: buyCount=' + this.buyCount
-      + ', totalPrice=' + this.totalPrice
-      + ', isAllChecked=' + this.isAllChecked);
   }
 }
 

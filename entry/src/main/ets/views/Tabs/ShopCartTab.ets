@@ -7,23 +7,10 @@ import { StatisticsView } from "../Cart/StatisticsView";
 export struct ShopCartTab {
   @Local
   cartViewModel: CartViewModel = cartViewModel;
-  @Local
-  buyCount: number = 0;
-  @Local
-  totalPrice: number = 0;
-  @Local
-  isAllChecked: boolean = false;
-
-  private refreshLocalState(): void {
-    this.buyCount = this.cartViewModel.buyCount;
-    this.totalPrice = this.cartViewModel.totalPrice;
-    this.isAllChecked = this.cartViewModel.isAllChecked;
-  }
 
   @Provider('updateChecked')
   updateChecked: (id: string, checked: boolean) => void = (id, checked) => {
     this.cartViewModel.updateItemChecked(id, checked);
-    this.refreshLocalState();
   }
 
   @Provider('countChange')
@@ -36,7 +23,6 @@ export struct ShopCartTab {
     } else {
       this.cartViewModel.decreaseCartItem(id);
     }
-    this.refreshLocalState();
   }
 
   build() {
@@ -49,19 +35,17 @@ export struct ShopCartTab {
         Row() {
           CartTitleView({deleteCart: () => {
             this.cartViewModel.removeCheckedItems();
-            this.refreshLocalState();
           }});
         }
         .layoutGravity(LocalizedAlignment.TOP)
 
         Row() {
           StatisticsView({
-            buyCount: this.buyCount,
-            totalAmount: this.totalPrice,
-            isAllChecked: this.isAllChecked,
+            buyCount: this.cartViewModel.buyCount,
+            totalAmount: this.cartViewModel.totalPrice,
+            isAllChecked: this.cartViewModel.isAllChecked,
             allCheckedChange: (isAllChecked) => {
               this.cartViewModel.allCheckedChange(isAllChecked);
-              this.refreshLocalState();
             }
           })
         }
