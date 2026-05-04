@@ -1,4 +1,5 @@
 import { GoodsItem } from "../models/Goods/GoodsItem";
+import { goodsService } from "../services/GoodsService";
 
 @ObservedV2
 export class GoodsListViewModel {
@@ -6,14 +7,20 @@ export class GoodsListViewModel {
   @Trace isLoading: boolean = false;
   @Trace isRefreshing : boolean = false;
 
-  // 加载商品列表 Todo mock换成网络数据
-  loadGoodsList(): void {
+  // 加载商品列表
+  async loadGoodsList(): Promise<void> {
+    /*
+     * 如果 getGoodsList() 抛异常，isLoading 永远卡在 true，列表空白，用户不知道发生了什么。
+     * 所以使用try来进行获取资源
+     * */
     this.isLoading = true;
-    this.goodsList = [
-      new GoodsItem('1', '苹果 iPhone 15 Pro Max', 7999, 'A17 Pro 芯片'),
-      new GoodsItem('2', '华为 Mate 60 Pro', 6999, '麒麟 9000S'),
-      new GoodsItem('3', '小米 14 Ultra', 5999, '骁龙 8 Gen 3'),
-    ];
-    this.isLoading = false;
+    try {
+      this.goodsList = await goodsService.getGoodsList();
+    } catch (err) {
+      // 暂时 print 日志，后续加错误状态
+      console.error('加载商品失败: ' + JSON.stringify(err));
+    } finally {
+      this.isLoading = false;
+    }
   }
 }
