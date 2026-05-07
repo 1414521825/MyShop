@@ -16,7 +16,7 @@ export class GoodsItem {
   @Trace
   goodsImage: string;
 
-  constructor(id: string, goodsName: string, goodsPrice: number, goodsDesc: string, goodsImage: string = "app.media.a") {
+  constructor(id: string, goodsName: string, goodsPrice: number, goodsDesc: string, goodsImage: string = "app.media.p1") {
     this.id = id;
     this.goodsName = goodsName;
     this.goodsPrice = goodsPrice;

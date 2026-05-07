@@ -26,11 +26,12 @@ export struct HomeTab {
               this.selectedCount ++;
             }})
           }
+          .margin(2)
         }, (item: GoodsItem) => item.id)
       }
       .columnsTemplate('1fr 1fr')
-      .columnsGap(4)
-      .rowsGap(8)
+      // .columnsGap(4)
+      // .rowsGap(8)
       .layoutWeight(1)
 
       // 商品详情（底部弹出）

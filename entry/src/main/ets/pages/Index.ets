@@ -15,7 +15,8 @@ struct Index {
     Navigation(this.pageStack) {
       Tabs() {
         TabContent() {
-          HomeTab();
+          HomeTab()
+            .backgroundColor('#EBEBEB')
         }
           .tabBar("首页")
         TabContent()

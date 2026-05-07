@@ -132,7 +132,13 @@
 
 ### 自查清单
 - [ ] 能解释 `@State` 和 `@Local` 的本质区别吗？
+
+* `@State`和`@Local`都是可以监测数据变化的，且都只能监测一层。区别在于是否可以接收外部值，`@State`可以接收父组件的值，但`@Local`只能本地初始化，不能接收父组件的值。
+
 - [ ] `@Param` 和 `@Prop` 的关键区别是什么？（提示：深拷贝 vs 引用）
+
+* 
+
 - [ ] `@ObservedV2` 必须配合 `@Trace` 才生效，忘了加 `@Trace` 会怎样？
 - [ ] `@Computed` 的缓存失效条件是什么？依赖非 `@Trace` 属性会怎样？
 - [ ] `Navigation` 的 `pushPath` 和 `router.pushUrl` 有什么本质区别？
