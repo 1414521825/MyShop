@@ -1,10 +1,10 @@
-import { CartItem } from "../../models/Goods/CartItem"
+import { CartItemViewModel } from "../../viewmodels/Cart/CartItemViewModel"
 import { CartListItemView } from "./CartListItemView";
 
 @ComponentV2
 export struct CartListView {
   @Require @Param
-  cartList: CartItem[] = [];
+  cartList: CartItemViewModel[] = [];
 
   // @Builder装饰器用于封装可复用的UI结构
   @Builder
@@ -28,13 +28,13 @@ export struct CartListView {
           header: this.itemHead(),
           footer: this.itemFooter()
         }) {
-          ForEach(this.cartList, (item: CartItem) => {
+          ForEach(this.cartList, (item: CartItemViewModel) => {
             ListItem() {
               CartListItemView({
                 cartItem: item
               })
             }
-          }, (item: CartItem) => item.id)
+          }, (item: CartItemViewModel) => item.id)
         }
         .divider({strokeWidth: 12, color: '#F1F3F5'})
       }

@@ -1,4 +1,4 @@
-import { cartViewModel, CartViewModel } from "../../viewmodels/CartViewModel";
+import { cartViewModel, CartViewModel } from "../../viewmodels/Cart/CartViewModel";
 import { CartListView } from "../Cart/CartListView";
 import { CartTitleView } from "../Cart/CartTitleView";
 import { StatisticsView } from "../Cart/StatisticsView";
@@ -18,7 +18,7 @@ export struct ShopCartTab {
     if (op === 'add') {
       const item = this.cartViewModel.cartItemList.find(i => i.id === id);
       if (item) {
-        this.cartViewModel.addCartItem(item.goods);
+        this.cartViewModel.addCartItem(item.goods, 1);
       }
     } else {
       this.cartViewModel.decreaseCartItem(id);

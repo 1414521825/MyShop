@@ -1,16 +1,17 @@
-import { GoodsItem } from '../models/Goods/GoodsItem'
-import { cartViewModel, CartViewModel } from "../viewmodels/CartViewModel";
+import { GoodsItemViewModel } from "../viewmodels/Goods/GoodsItemViewModel";
 
 @ComponentV2
 export struct GoodsDetailCard {
   @Require @Param
-  goodsItem: GoodsItem;
+  goodsItem: GoodsItemViewModel;
   @Require @Param
   count: number;
   @Event
-  onCountChange: (id: string, count: number) => void;
+  onCountChange: (count: number) => void;
   @Event
   onClose: () => void;
+  @Event
+  onAddCart: (goods: GoodsItemViewModel, count: number) => void;
 
   build() {
     Column() {
@@ -56,7 +57,7 @@ export struct GoodsDetailCard {
           .fontSize(14)
         Button('加入购物车')
           .onClick(() => {
-            cartViewModel.addCartItem(this.goodsItem);
+            this.onAddCart(this.goodsItem, this.count);
             this.onClose();
           })
 
@@ -69,7 +70,7 @@ export struct GoodsDetailCard {
           .padding(0)
           .onClick(() => {
             if (this.count > 1) {
-              this.onCountChange(this.goodsItem.id, this.count - 1);
+              this.onCountChange(this.count - 1);
             }
           })
         Text(`${this.count}`)
@@ -83,7 +84,7 @@ export struct GoodsDetailCard {
           .backgroundColor(Color.Gray)
           .padding(0)
           .onClick(() => {
-            this.onCountChange(this.goodsItem.id, this.count + 1);
+            this.onCountChange(this.count + 1);
           })
       }
       .width('100%')

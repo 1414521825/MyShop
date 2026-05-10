@@ -1,5 +1,6 @@
-import { GoodsItem } from '../../models/Goods/GoodsItem';
-import { GoodsListViewModel } from '../../viewmodels/GoodsListViewModel'
+import { cartViewModel } from '../../viewmodels/Cart/CartViewModel';
+import { GoodsItemViewModel } from '../../viewmodels/Goods/GoodsItemViewModel';
+import { GoodsListViewModel } from '../../viewmodels/Goods/GoodsListViewModel'
 import { GoodsDetailCard } from '../GoodsDetailCard';
 import GoodsListItem from '../GoodsListItem';
 
@@ -8,7 +9,7 @@ export struct HomeTab {
   @Local
   goodsListViewModel: GoodsListViewModel = new GoodsListViewModel();
   @Local
-  selectedItem: GoodsItem | null = null;
+  selectedItem: GoodsItemViewModel | null = null;
   @Local
   selectedCount: number = 0;
 
@@ -19,15 +20,15 @@ export struct HomeTab {
   build() {
     Column() {
       WaterFlow() {
-        ForEach(this.goodsListViewModel.goodsList, (item: GoodsItem) => {
+        ForEach(this.goodsListViewModel.goodsList, (item: GoodsItemViewModel) => {
           FlowItem() {
             GoodsListItem({goodsItem: item, onItemClick: (goodsItem) => {
               this.selectedItem = goodsItem;
-              this.selectedCount ++;
+              this.selectedCount = 1;
             }})
           }
           .margin(2)
-        }, (item: GoodsItem) => item.id)
+        }, (item: GoodsItemViewModel) => item.id)
       }
       .columnsTemplate('1fr 1fr')
       // .columnsGap(4)
@@ -39,12 +40,15 @@ export struct HomeTab {
         GoodsDetailCard({
           goodsItem: this.selectedItem,
           count: this.selectedCount,
-          onCountChange: (id: string, count: number) => {
+          onCountChange: (count: number) => {
             this.selectedCount = count;
           },
           onClose: () => {
             this.selectedItem = null;
             this.selectedCount = 0;
+          },
+          onAddCart: (goods: GoodsItemViewModel, count: number) => {
+            cartViewModel.addCartItem(goods, count);
           }
         });
       }

@@ -1,593 +1,527 @@
 # 拼多多风格商城 App — 鸿蒙学习计划
 
-> **目标**：以项目驱动学习鸿蒙（HarmonyOS）开发，掌握 ArkUI + ComponentV2 状态管理 + MVVM 架构。
-> **角色**：客户端开发工程师（鸿蒙方向），应届生入职。
-> **项目**：模仿拼多多核心功能的练手商城 App。
+> **目标**：以电商业务项目驱动学习 HarmonyOS 客户端开发，掌握 ArkUI、ComponentV2 状态管理、MVVM 分层、网络容错、登录态、复杂列表、时间一致性、性能分析和稳定性治理。
+> **角色**：即将入职拼多多鸿蒙客户端开发的应届生。
+> **项目定位**：不是简单复刻拼多多页面，而是做一个具备真实客户端工程能力的电商练习项目。
 
 ---
 
 ## 学习方法论
 
-- **知识点驱动，而非代码驱动**：项目的目的是掌握鸿蒙技术栈，代码是该过程的产出物。
-- **V2 优先**：以 ComponentV2（状态管理 V2）为主线，所有新代码默认使用 V2 装饰器。同时建立 V1 对照认知，因为实际项目可能仍是 V1。
-- **每阶段循环**：读文档 → 动手写 → 刻意对比 V1/V2 → 自查清单复盘 → 进入下一阶段。
-- **自查清单不为考核**，为帮助建立概念之间的关联。如果某个问题"大概知道但说不清楚"，就是需要回去深挖的知识盲区。
+- **业务闭环优先**：每个阶段都要产出可运行、可验证的小闭环，不只写孤立 API 示例。
+- **知识点服务于工程能力**：页面能展示只是第一步，更重要的是弱网不崩、异常有兜底、状态不乱、列表不卡、问题能定位。
+- **V2 优先，V1 对照**：学习项目以 ComponentV2 为主，但每个核心场景保留 V1/V2 对照认知。遇到 V2 边缘问题时，记录复现条件、降级方案和是否适合生产使用。
+- **先深后广**：优先做深购物车、网络层、登录态、拼团倒计时、推荐流性能；果园、砍价、分享海报等运营玩法放到最后作为扩展实验。
+- **每阶段必须复盘**：读文档、写代码、跑验证、做 V1/V2 对照、记录踩坑、补性能观察，缺一项就不算阶段完成。
 
 ---
 
 ## 每周学习节奏
 
-每个阶段（1.5-3 周）内部，按以下节奏循环：
+每个阶段内部按以下节奏推进：
 
-| 时间段   | 任务                                                         |
-| -------- | ------------------------------------------------------------ |
-| 周一~二  | 精读本周目标的官方文档，**把文档里的示例代码跑通**（不要只看不写） |
-| 周三~五  | 完成练手任务的核心部分，遇到问题优先查 API 参考、华为开发者社区 |
-| 周六     | 自查清单复盘 + 查漏补缺 + 更新踩坑记录                        |
-| 周日     | 休息或自由探索（如：看看拼多多 App 对应功能是怎么交互的，拆解技术实现思路） |
+| 时间段 | 任务 |
+| --- | --- |
+| 周一~二 | 精读本阶段官方文档，把关键示例跑通，记录 V1/V2 差异 |
+| 周三~五 | 完成核心业务闭环，先保证可运行，再补边界状态 |
+| 周六 | 自查清单复盘、整理踩坑记录、补测试或手动验证用例 |
+| 周日 | 观察拼多多 App 对应交互，拆解真实业务状态和技术实现 |
 
-> **原则**：宁可周六复盘发现没学透、下周重新深挖，也不要赶进度跳过自查清单。
+每阶段固定产出：
+
+1. 一个可运行功能闭环。
+2. 一份阶段自查结论。
+3. 至少一条踩坑记录。
+4. 一组 V1/V2 对照笔记。
+5. 一次性能或稳定性观察。
 
 ---
 
-## 贯穿全项目的三条主线
+## 贯穿全项目的五条主线
 
+```text
+MVVM 分层
+  -> 登录态
+  -> 网络容错
+  -> 购物车 / SKU / 拼团
+  -> 推荐流性能
+  -> 可观测性和降级能力
 ```
-       MVVM 分层架构
-            ↕
-登录态体系 ──→ HTTP 拦截器 ──→ 所有业务 ViewModel
-            ↕
-  缓存一致性 ──→ 时间校准 ──→ 倒计时组件 / 拼团 / 限时活动
+
+### 主线一：MVVM 分层
+
+目标不是目录看起来像 MVVM，而是形成稳定的数据流：
+
+```text
+View 用户事件
+  -> ViewModel 方法
+  -> Service / Repository
+  -> Model / DTO
+  -> ViewModel 更新 @Trace 状态
+  -> View 通过 @Param 渲染
 ```
 
-三者互相咬合：
-- **登录态**：数据通道的令牌，无它则所有业务接口走不通。
-- **MVVM**：代码的组织骨架，决定数据如何流向 UI。
-- **缓存一致性**：拼团这类强实时业务的命门，倒计时漂移 = 用户投诉。
+当前重构思路详见 [MVVM_REFACTOR_PLAN.md](MVVM_REFACTOR_PLAN.md)。
 
-配合**性能优化**贯穿所有阶段：
-- 启动速度 → 冷启动链路精简 + 延迟初始化
-- 页面打开速度 → 预拉数据 + 骨架屏
-- 列表流畅度 → `@ReusableV2` + 图片缓存 + 分页预拉
-- 网络层 → 请求合并 + 缓存策略分级
+### 主线二：登录态和网络容错
+
+登录态不是一个登录页，而是所有业务接口、路由守卫、Token 刷新、缓存清理和异常兜底的基础。
+
+必须覆盖：
+
+- AccessToken / RefreshToken 分开管理。
+- 并发 401 只刷新一次 Token。
+- 刷新失败时所有等待请求统一失败并跳登录。
+- 退出登录清理 Token、用户信息、接口缓存、购物车本地缓存。
+- 手机号、Token、用户 ID 等敏感信息日志脱敏。
+
+### 主线三：复杂电商业务态
+
+电商客户端最容易出问题的不是静态页面，而是业务状态组合。
+
+| 模块 | 必练业务态 |
+| --- | --- |
+| 商品详情 | SKU 可选/不可选、库存不足、活动价、券后价 |
+| 购物车 | 商品失效、库存不足、限购、价格变化、部分不可结算 |
+| 订单 | 地址缺失、提交失败、价格二次确认、重试 |
+| 拼团 | 倒计时过期、人数不足、成功/失败、前后台恢复 |
+| 推荐流 | 分页失败、重复数据、乱序返回、空数据 |
+
+### 主线四：性能和体验
+
+性能不是最后才做的优化，而是每阶段都要观察。
+
+- 启动速度：冷启动链路、延迟初始化。
+- 页面打开速度：预拉数据、骨架屏、缓存。
+- 列表流畅度：WaterFlow、分页、图片缓存、复用。
+- 网络体验：请求去重、弱网重试、失败重试。
+- 交互反馈：按钮状态、加载态、错误态、空态。
+
+### 主线五：可观测性和降级
+
+真实工程里，能复现、能定位、能降级比“理想写法”更重要。
+
+固定记录模板：
+
+```markdown
+## V2 问题降级记录
+
+**V2 写法**：
+**触发问题**：
+**最小复现条件**：
+**V1/普通写法替代方案**：
+**是否适合生产使用**：
+```
 
 ---
 
-## ComponentV2 装饰器速览（核心地图）
+## ComponentV2 装饰器速览
 
-| V1（旧）                    | V2（新）                        | 用途                      |
-| --------------------------- | ------------------------------- | ------------------------- |
-| `@State`                    | `@Local`                        | 组件内部私有状态，必须本地初始化 |
-| `@Prop`                     | `@Param`                        | 父→子单向传参，传引用（非深拷贝） |
-| `@Link`                     | `@Param` + `@Event`             | 父子双向同步，子通过回调通知父 |
-| `@Observed` + `@ObjectLink` | `@ObservedV2` + `@Trace`        | 类属性深度观测，精准到属性级刷新 |
-| `@Provide` / `@Consume`     | `@Provider` / `@Consumer`       | 跨层级状态共享 |
-| `@Watch`                    | `@Monitor`                      | 状态变化监听，可获取变化前后值 |
-| 无                          | `@Computed`                     | 计算属性，依赖不变时自动复用缓存 |
-| 无                          | `@Once`                         | 搭配 `@Param`，仅首次初始化后不再同步 |
-| `@Reusable`                 | `@ReusableV2`                   | 组件复用（API 18+） |
-| 无                          | `@Type`                         | 配合 `PersistenceV2` 标记序列化类型 |
+| V1 | V2 | 用途 | 学习重点 |
+| --- | --- | --- | --- |
+| `@State` | `@Local` | 组件内部私有状态 | 只能本地初始化，适合局部展示态 |
+| `@Prop` | `@Param` | 父到子单向传参 | V2 传引用，不是深拷贝 |
+| `@Link` | `@Param` + `@Event` | 父子双向同步 | 子组件只上报事件，父级统一改数据 |
+| `@Observed` + `@ObjectLink` | `@ObservedV2` + `@Trace` | 类属性观测 | 需要刷新 UI 的字段才加 `@Trace` |
+| `@Provide` / `@Consume` | `@Provider` / `@Consumer` | 跨层级共享 | 不要滥用成全局事件总线 |
+| `@Watch` | `@Monitor` | 状态监听 | 适合副作用，不替代渲染状态 |
+| 无 | `@Computed` | 计算属性 | 适合单层稳定依赖，深层数组要谨慎 |
+| 无 | `@Once` | 只接收首次参数 | 列表项中稳定字段可用 |
+| `@Reusable` | `@ReusableV2` | 组件复用 | API 18+，配合长列表验证性能 |
+| 无 | `@Type` | 序列化类型标记 | 配合持久化和嵌套类 |
 
-> **API 版本要求**：基础 V2（API 12+），`@ReusableV2`（API 18+）。
-> **当前状态**：V2 为试用版，生产项目应评估稳定性后使用。
+关键原则：
+
+- `@Computed` 不迷信。购物车总价、全选、结算数量这类跨数组派生状态，优先在 ViewModel 中显式维护。
+- `@Provider/@Consumer` 只用于真正跨层级共享。普通父子组件通信优先 `@Param + @Event`。
+- `@Param` 对象不要在子组件中直接改业务字段，避免隐式修改父级数据源。
 
 ---
 
-## 第一阶段：项目骨架 + MVVM + 性能基础设施（2 周）
+## 阶段 0：当前代码修正 + MVVM 重构基线（2-3 天）
 
 ### 学习目标
-掌握 `@ComponentV2` 声明式 UI 范式、V2 基础装饰器、MVVM 分层、路由、网络请求。
 
-### V2 知识点
+修正当前项目中类型、import、全局状态调用和购物车派生状态问题，为后续功能打基础。
 
-| 知识点                     | 说明                                                         |
-| -------------------------- | ------------------------------------------------------------ |
-| `@ComponentV2`             | 替代 `@Component`，所有自定义组件默认用 V2                   |
-| `@Local`                   | 替代 `@State`，组件内部状态，**必须本地初始化**，禁止外部传入 |
-| `@Param`                   | 替代 `@Prop`，父→子单向传参，**传引用（非深拷贝）**            |
-| `@Param` + `@Event`        | 替代 `@Link`，子组件通过 `@Event` 回调通知父组件修改数据源    |
-| `@ObservedV2` + `@Trace`   | 替代 `@Observed` + `@ObjectLink`，类属性精准观测，**不再需要为每个子层级拆组件** |
-| `@Computed`                | 计算属性 getter，依赖不变时自动复用缓存结果                   |
+### 重点任务
+
+1. 统一 `GoodsItemModel` / `GoodsItemViewModel` / `GoodsItem` 的职责和命名。
+2. 统一 `CartItemModel` / `CartItemViewModel` / `CartItem` 的职责和命名。
+3. 删除或修正残留文件，如 `GoodsModel.ets`。
+4. 删除 `GoodsListViewModel` 中无效语句。
+5. `GoodsDetailCard` 不再直接 import 全局 `cartViewModel`，改为通过 `@Event onAddCart` 上报。
+6. `CartViewModel` 显式维护 `totalPrice`、`buyCount`、`isAllChecked`。
+7. 购物车列表项通信从 `@Provider/@Consumer` 改为显式 `@Param + @Event`。
+
+### 验收标准
+
+- 首页商品列表可展示。
+- 点击商品可打开详情卡片。
+- 加购后购物车可展示。
+- 勾选、全选、加减数量后总价和结算数量稳定更新。
+- View 不直接调用 Service 或全局业务 ViewModel。
+
+### 自查清单
+
+- [ ] `views/` 中是否还直接 import `cartViewModel`？
+- [ ] 购物车派生状态是否还依赖深层数组 `@Computed`？
+- [ ] 子组件依赖的数据和事件是否能从入参看出来？
+- [ ] Service 是否仍然只负责数据来源？
+
+---
+
+## 阶段 1：项目骨架 + ArkUI + Navigation + MVVM（1.5 周）
+
+### 学习目标
+
+掌握 ArkUI 页面结构、`Navigation`、底部 Tab、页面组装、ViewModel 生命周期和组件通信。
 
 ### 鸿蒙知识点
 
-| 知识点           | 说明                                   |
-| ---------------- | -------------------------------------- |
-| ArkTS 类型系统   | `interface` / `class` / 泛型在 ArkTS 中的限制 |
-| 页面路由         | `Navigation` + `NavPathStack`（推荐方案） vs 旧版 `router` |
-| 网络请求         | `@ohos.net.http` 基本用法、HTTPS 证书配置 |
-| 应用生命周期     | `AbilityStage` / `UIAbility` / `WindowStage` 回调顺序 |
-| 数据持久化       | `@ohos.data.preferences` 轻量 KV 存储 |
-| 日志             | `hilog` 打点，观察回调时序             |
-
-### 前置阅读
-- 华为开发者文档：**状态管理 V2** — `@ComponentV2`、`@Local`、`@Param`、`@Event`、`@ObservedV2`、`@Trace`、`@Computed`
-- **Navigation 组件** 文档
-- **UIAbility 组件生命周期** 文档
+| 知识点 | 说明 |
+| --- | --- |
+| `@ComponentV2` | V2 组件声明方式 |
+| `Navigation` + `NavPathStack` | 页面跳转和路由栈管理 |
+| `Tabs` / `TabContent` | 首页、分类、消息、购物车、个人中心 |
+| `@Local` / `@Param` / `@Event` | 页面局部状态和父子通信 |
+| `AbilityStage` / `UIAbility` | 应用生命周期基础 |
+| `hilog` | 生命周期和关键行为日志 |
 
 ### 练手任务
-1. 用 `@ComponentV2` + `Navigation` + 底部 TabBar 搭建 5 个 Tab 页壳子（首页/分类/消息/购物车/个人中心）
-2. 定义 `@ObservedV2 class GoodsItem`，`@Trace` 标注需要响应式的字段，写商品列表页
-3. 将列表状态抽到 `GoodsListViewModel`（同样 `@ObservedV2`），页面用 `@Local` 持有
-4. **刻意练习 `@Param` + `@Event`**：列表页传选中商品给详情卡片，卡片内用 `@Event` 通知父组件修改数量
-5. **刻意练习 `@Computed`**：实现购物车总价计算属性，观察依赖不变时跳过计算的日志
-6. 封装网络请求工具类，Mock 一组商品 JSON 数据请求回来
-7. 项目已建好的目录结构：
 
-   ```
-   entry/src/main/ets/
-   ├── models/          # 数据模型（@ObservedV2 class）
-   ├── viewmodels/      # ViewModel：状态持有 + 业务逻辑
-   ├── views/           # 可复用 UI 组件（@ComponentV2，不含 @Entry）
-   ├── pages/           # 页面级组件（路由目的地，@Entry 装饰）
-   ├── services/        # 网络请求、本地存储
-   └── utils/           # 工具函数、常量、类型定义
-   ```
+1. 搭建 5 个 Tab 页壳子：首页、分类、消息、购物车、个人中心。
+2. 用 `Navigation` 管理后续商品详情、登录页、确认订单页。
+3. 首页展示商品列表，列表状态由 `GoodsListViewModel` 管理。
+4. 商品卡片点击后通过事件通知页面打开详情卡片或详情页。
+5. 抽出通用空态、加载态、错误态组件。
+6. 用 `PerfTracker` 打点首页首次展示耗时。
 
-   > **pages/ vs views/ 约定**：`pages/` 放路由目的页面（用 `@Entry` 装饰），`views/` 放可复用的子组件（用 `@ComponentV2` 装饰，被页面组装使用）。比如商品卡片组件放 `views/`，首页、商品详情页放 `pages/`。
+### V1/V2 对照思考
 
-### V1→V2 对照思考
-- `@Prop` 对复杂类型做**深拷贝**，`@Param` 传的是**引用**。这意味着子组件如果直接修改 `@Param` 对象的属性，父组件数据也会变——这带来了什么问题？如何规避？
-- `@State` 可以从外部初始化，`@Local` 不可以。这迫使你把"需要外部传入"和"组件私有"分开——对架构设计是好事还是限制？
+- `@State` 可以外部初始化，`@Local` 不可以，这对组件职责有什么影响？
+- V1 中 `@Prop` 深拷贝和 V2 中 `@Param` 传引用分别适合什么场景？
+- `router.pushUrl` 和 `NavPathStack.pushPath` 在可维护性上有什么区别？
 
 ### 自查清单
-- [ ] 能解释 `@State` 和 `@Local` 的本质区别吗？
 
-* `@State`和`@Local`都是可以监测数据变化的，且都只能监测一层。区别在于是否可以接收外部值，`@State`可以接收父组件的值，但`@Local`只能本地初始化，不能接收父组件的值。
-
-- [ ] `@Param` 和 `@Prop` 的关键区别是什么？（提示：深拷贝 vs 引用）
-
-* 
-
-- [ ] `@ObservedV2` 必须配合 `@Trace` 才生效，忘了加 `@Trace` 会怎样？
-- [ ] `@Computed` 的缓存失效条件是什么？依赖非 `@Trace` 属性会怎样？
-- [ ] `Navigation` 的 `pushPath` 和 `router.pushUrl` 有什么本质区别？
-- [ ] `AbilityStage.onCreate` 和 `UIAbility.onCreate` 谁先执行？各自适合干什么？
+- [ ] Tab 页面是否只负责组装，不做复杂业务计算？
+- [ ] 商品卡片是否能独立复用？
+- [ ] 页面跳转参数是否类型清晰？
+- [ ] 首页是否具备 loading / empty / error / success？
 
 ---
 
-## 第二阶段：登录态体系（1.5-2 周）
+## 阶段 2：网络层 + 请求状态 + 登录态（1.5 周）
 
 ### 学习目标
-掌握全局状态共享、`@Provider`/`@Consumer`、`@Monitor`、Token 管理、路由守卫。
 
-### V2 知识点
-
-| 知识点                     | 说明                                                         |
-| -------------------------- | ------------------------------------------------------------ |
-| `@Provider` / `@Consumer`  | 替代 `@Provide` / `@Consume`，跨层级共享状态。<br>V2 差异：`@Consumer` **必须本地初始化默认值**，`@Provider` **不允许从父组件初始化** |
-| `@Monitor`                 | 替代 `@Watch`，监听状态变化，可获取变化前后值，支持深层监听     |
-| `@ObservedV2` 单例模式     | `@ObservedV2 class` + `export const` 实现全局响应式单例        |
+从 Mock 过渡到真实网络层思维，掌握统一请求状态、错误态、Token 管理、401 刷新队列和路由守卫。
 
 ### 鸿蒙知识点
 
-| 知识点           | 说明                                   |
-| ---------------- | -------------------------------------- |
-| 数据持久化       | `@ohos.data.preferences` 存取 Token     |
-| HTTP 拦截器链     | Token 注入 → 401 检测 → 刷新重试 → 失败跳登录 |
-| 路由守卫         | push 前拦截，未登录跳转登录页，登录后回跳   |
-| 文本输入组件     | `TextInput` 手机号/验证码输入            |
+| 知识点 | 说明 |
+| --- | --- |
+| `@ohos.net.http` | HTTP 请求基础 |
+| `preferences` | 轻量持久化，适合学习 Token 存取 |
+| Universal Keystore Kit | 了解敏感信息安全存储方向 |
+| `TextInput` | 手机号、验证码输入 |
+| 路由守卫 | 登录前拦截需要权限的页面 |
 
-### 前置阅读
-- **@Provider / @Consumer** 文档（重点读 V1/V2 差异）
-- **@Monitor** 文档
-- **@ohos.data.preferences** API 参考
-- **TextInput 组件** 文档
+### 统一请求状态
+
+```typescript
+type RequestStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
+
+@ObservedV2
+class RequestState<T> {
+  @Trace status: RequestStatus = 'idle';
+  @Trace data?: T;
+  @Trace errorMessage: string = '';
+}
+```
 
 ### 练手任务
-1. 实现 `AuthViewModel`：`@ObservedV2 class` + `@Trace isLoggedIn` + `@Trace userInfo`，单例导出
-2. 登录页：手机号输入框 + 验证码输入 + 获取验证码按钮（含 60 秒倒计时）
-3. 登录成功后 Token 写入 `preferences`，App 重启自动恢复登录态
-4. **刻意练习 `@Provider`/`@Consumer`**：根组件 `@Provider('auth')` 提供登录态，各 Tab 页用 `@Consumer('auth')` 消费
-5. **刻意练习 `@Monitor`**：在需要感知登录状态的页面 `@Monitor('auth.isLoggedIn')` 监听变化做后续处理
-6. 手写 HTTP 拦截器链：自动注入 Token → 遇到 401 自动刷新 → 刷新失败跳登录
-7. 实现路由守卫：`NavPathStack.pushPath` 前检查登录态
 
-### V1→V2 对照思考
-- V1 `@Consume` 和 V2 `@Consumer` 的关键区别：V2 必须本地初始化默认值。这意味着消费方需要知道"没有 Provider 时的默认行为"——设计考量是什么？
-- `@Provider` 和 `@Consumer` 通过字符串 key 匹配，**强依赖组件层级**。它和单例模式分别适用于什么场景？能否滥用？
+1. 封装 `HttpClient`，统一处理 JSON parse、状态码、网络错误。
+2. `GoodsListViewModel` 使用 `RequestState<GoodsItemModel[]>`。
+3. 实现登录页：手机号、验证码、获取验证码倒计时。
+4. 实现 `AuthService`、`TokenStore`、`AuthViewModel`。
+5. 实现 Token 注入、401 刷新、刷新失败跳登录。
+6. 并发 401 时队列化，只允许一个刷新请求。
+7. 退出登录时清理 Token、用户信息、缓存和购物车本地数据。
+8. 敏感日志脱敏。
+
+### V1/V2 对照思考
+
+- 登录态用单例 ViewModel、`@Provider/@Consumer`、`AppStorageV2` 分别有什么利弊？
+- `@Monitor` 适合监听登录态做副作用，还是适合作为页面渲染的数据来源？
 
 ### 自查清单
-- [ ] `@Provider` 和单例模式各自的适用场景是什么？
-- [ ] 如果同时有多个 `@Provider('auth')`，哪个生效？
-- [ ] `@Monitor` 为什么能拿到变化前后的值，`@Watch` 为什么不行？
-- [ ] HTTP 拦截器链中，并发请求同时遇到 401 时怎么处理 Token 刷新？（队列化）
-- [ ] 路由守卫放在 `pushPath` 之前还是之后？为什么？
-- [ ] `preferences` 的数据能否跨应用共享？安全性如何？
+
+- [ ] 所有页面是否都有失败态和重试入口？
+- [ ] 并发 401 是否只刷新一次 Token？
+- [ ] Token 刷新失败后等待中的请求如何结束？
+- [ ] 退出登录是否清理了业务缓存？
+- [ ] 日志中是否打印了完整手机号或 Token？
 
 ---
 
-## 第三阶段：拼团核心 + 时间一致性（2.5-3 周）
+## 阶段 3：商品详情 + SKU + 购物车复杂业务态（2 周）
 
 ### 学习目标
-掌握 `@ObservedV2` 嵌套观测、`@Computed` 派生状态、`@Monitor` 深层监听、倒计时精度、前后台生命周期。
 
-### V2 知识点
-
-| 知识点                        | 说明                                                         |
-| ----------------------------- | ------------------------------------------------------------ |
-| `@ObservedV2` + `@Trace` 嵌套 | 嵌套类属性级精准观测，**V2 最大亮点**                         |
-| `@Computed`                   | 计算"还差几人"、"剩余时间百分比"等派生状态                     |
-| `@Monitor` 深层监听           | 监听 `'groupBuy.status'`，状态变化触发动画/通知                |
-| `@CustomDialog`               | 自定义弹窗（SKU 选择等）                                      |
+把购物车和商品详情从“能加购”做成接近真实业务的复杂状态练习。
 
 ### 鸿蒙知识点
 
-| 知识点             | 说明                                   |
-| ------------------ | -------------------------------------- |
-| 定时器精度         | `setInterval` 在页面后台时的行为，精度漂移问题 |
-| 前后台生命周期     | `onBackground` / `onForeground`，回到前台时刷新数据 |
-| 组件封装           | 自定义 `@ComponentV2` + `@BuilderParam` 插槽传 UI |
-| 列表交互           | `Swiper`（商品图轮播）、`Grid`（SKU 规格选择） |
-| 页面间传参         | `NavPathStack.pushPath` 带参，目标页 `onPageShow` 接收 |
-| 状态恢复           | `onSaveState` / `onRestoreState` 异常销毁后状态恢复 |
-
-### 前置阅读
-- **@ObservedV2 嵌套类** 文档
-- **@Monitor 深层监听** 文档
-- **@CustomDialog** 文档
-- **Swiper** / **Grid** 组件文档
-- **UIAbility 前后台生命周期** 文档
-- **onSaveState / onRestoreState** 文档
+| 知识点 | 说明 |
+| --- | --- |
+| `Swiper` | 商品图片轮播 |
+| `Grid` | SKU 规格选择 |
+| `@CustomDialog` | SKU 弹窗、价格变化确认 |
+| `List` | 购物车列表 |
+| `@ObservedV2` + `@Trace` | 商品、SKU、购物车项状态 |
 
 ### 练手任务
-1. 商品详情页：`Swiper` 轮播 + SKU `Grid` 选择 + `@CustomDialog` 弹窗选规格 + 底部固定购买栏
-2. **重点：`@ObservedV2` 嵌套拼团模型**
 
-   ```typescript
-   @ObservedV2
-   class GroupBuy {
-     @Trace groupId: string = '';
-     @Trace status: 'pending' | 'success' | 'failed' = 'pending';
-     @Trace endTime: number = 0;    // 服务端截止时间戳
-     @Trace members: Member[] = []; // 参团人列表
-     @Trace requiredCount: number = 2;
-     @Trace @Type(Member) leader: Member = new Member();
-   }
+1. 商品详情页：图片轮播、标题、价格、SKU 选择、底部购买栏。
+2. SKU 选择：颜色、规格组合；不可选规格置灰；库存不足禁止加购。
+3. 购物车支持：勾选、全选、加减数量、删除已选。
+4. 异常业务态：
+   - 商品失效，置灰但保留在购物车。
+   - 库存不足，数量自动降级。
+   - 价格变化，结算前弹窗提示。
+   - 部分商品不可结算。
+5. 购物车派生状态由 ViewModel 显式维护：总价、结算数量、全选状态。
+6. 加购、减购、勾选支持乐观更新；失败时回滚。
 
-   @ObservedV2
-   class Member {
-     @Trace name: string = '';
-     @Trace avatar: string = '';
-   }
-   ```
+### V1/V2 对照思考
 
-   验证：修改 `members[0].name` 是否触发 UI 更新？为什么？（提示：数组元素观测机制）
-
-3. **刻意练习 `@Computed` 派生状态**
-
-   ```typescript
-   @Computed
-   get remainCount(): number {
-     return this.groupBuy.requiredCount - this.groupBuy.members.length;
-   }
-   @Computed
-   get remainSeconds(): number {
-     return this.groupBuy.endTime - (Date.now() + this.timeOffset);
-   }
-   @Computed
-   get progressPercent(): number {
-     return (this.groupBuy.members.length / this.groupBuy.requiredCount) * 100;
-   }
-   ```
-
-4. **刻意练习 `@Monitor` 深层监听**
-
-   ```typescript
-   @Monitor('groupBuy.status')
-   onStatusChange(monitor: IMonitor) {
-     const before = monitor.value()?.before;  // 'pending'
-     const now = monitor.value()?.now;        // 'success'
-   }
-   @Monitor('groupBuy.members.length')
-   onMemberJoin(monitor: IMonitor) {
-     // 有人参团时的动画/提示
-   }
-   ```
-
-5. 封装倒计时组件 `CountdownComponent`，接收 `endTime: number`（服务端时间戳），内部每秒 tick + 时间偏移校准
-6. **时间校准**：App 启动时请求一次服务端时间，计算 `offset = serverTime - localTime`，倒计时用 `serverEndTime - (Date.now() + offset)`。思考：offset 什么时候该重新校准？
-7. 开团/参团的完整购买流程（下单即可，不涉及真实支付）
-8. 页面切到后台 10 秒再回来，倒计时是否正确？`@Monitor` 没触发但数据可能已过期——怎么补救？
-
-### V1→V2 对照思考
-- V1 时代，`@Observed` + `@ObjectLink` **必须把子对象拆分到独立组件**才能精准更新。V2 的 `@ObservedV2` + `@Trace` 直接做到了属性级精准刷新——这对你的组件粒度设计有什么影响？
-- `@Monitor` 可以深层监听 `'groupBuy.members.0.name'`，但监听太细会有什么问题？
+- SKU 多层嵌套对象用 V1 `@Observed/@ObjectLink` 和 V2 `@ObservedV2/@Trace` 的组件粒度会有什么不同？
+- 哪些派生状态适合 `@Computed`，哪些应该在 ViewModel 中显式维护？
 
 ### 自查清单
-- [ ] `@ObservedV2` 嵌套类如果不加 `@ObservedV2`，只给属性加了 `@Trace`，能观测到吗？
-- [ ] `@Computed` 的缓存存在组件哪里？什么时候重建？
-- [ ] 时间校准的 offset 为什么不能只获取一次？
-- [ ] `setInterval` 在页面进入后台后会怎样？回来后时间偏了怎么修正？
-- [ ] 倒计时的源应该存在组件内还是 ViewModel 里？为什么？
-- [ ] 页面 A→B→C，C 修改了拼团状态，回到 A 时怎么刷新？
-- [ ] 鸿蒙生命周期和 Android Activity 生命周期有什么异同？
+
+- [ ] 子组件是否还直接修改 `@Param` 对象业务字段？
+- [ ] 购物车所有突变是否都经过 `CartViewModel`？
+- [ ] 价格变化、库存不足、商品失效是否都有 UI 兜底？
+- [ ] 失败回滚是否会导致 UI 和数据不一致？
 
 ---
 
-## 第四阶段：推荐流 + 社交裂变（2-3 周）
+## 阶段 4：拼团核心 + 时间一致性（1.5-2 周）
 
 ### 学习目标
-掌握 `@ReusableV2` 组件复用、`@Once` 静态内容优化、`freezeWhenInactive` 组件冻结、瀑布流、图片缓存、系统分享。
 
-### V2 知识点
-
-| 知识点                        | 说明                                                         |
-| ----------------------------- | ------------------------------------------------------------ |
-| `@ReusableV2` + `@ComponentV2` | 组件复用（API 18+），四个生命周期：`aboutToAppear` → `aboutToRecycle` → `aboutToReuse` → `aboutToDisappear`。<br>`aboutToReuse` **无入参**（与 V1 `@Reusable` 不同），状态重置由 V2 装饰器自动完成 |
-| `@Once`                        | 搭配 `@Param`，首次接收外部值后不再同步，且可本地修改<br>适用场景：列表项中不变的字段（ID、封面图 URL） |
-| `freezeWhenInactive`           | `@ComponentV2({ freezeWhenInactive: true })`，组件不可见时冻结数据更新 |
-| `@StorageLink` / `@StorageProp` | App 全局存储（V2 场景下的位置）                               |
+掌握拼团业务、服务端时间校准、倒计时精度、前后台恢复和活动过期兜底。
 
 ### 鸿蒙知识点
 
-| 知识点         | 说明                                   |
-| -------------- | -------------------------------------- |
-| 瀑布流         | `WaterFlow` 组件（4.0+）                |
-| 下拉刷新       | `Refresh` 组件 + `onRefresh`             |
-| 加载更多       | `List.onReachEnd` 或滑到底部触发         |
-| 图片缓存       | `Image` 组件 + 渐进式加载 + 三级缓存策略   |
-| 系统分享       | `@ohos.share` / `systemShare`           |
-| 剪贴板         | `@ohos.pasteboard` 复制邀请口令          |
-| 二维码         | `QRCode` 组件生成邀请码                  |
-| 响应式布局基础 | `@ohos.mediaquery`                       |
-
-### 前置阅读
-- **@ReusableV2** 文档（四个生命周期 + 状态重置规则）
-- **@Once** 文档
-- **freezeWhenInactive** 文档
-- **WaterFlow** / **Refresh** 组件文档
-- **@ohos.pasteboard** 文档
-- **系统分享** 文档
+| 知识点 | 说明 |
+| --- | --- |
+| `setInterval` | 倒计时 tick，但不能作为真实时间源 |
+| UIAbility 前后台生命周期 | 回到前台时刷新时间和活动状态 |
+| `@Monitor` | 监听拼团状态变化触发副作用 |
+| `@Computed` | 简单派生展示，如剩余人数 |
+| 本地通知 | 拼团成功或即将过期提醒，作为了解项 |
 
 ### 练手任务
-1. 双列瀑布流推荐页：`WaterFlow` + 下拉刷新 + 上滑加载更多
-2. **重点：`@ReusableV2` + `@ComponentV2` 实现列表项复用**
 
-   ```typescript
-   @ReusableV2
-   @ComponentV2
-   struct GoodsWaterfallItem {
-     @Param @Once goodsId: string = '';   // 不变，仅初始化一次
-     @Param @Once coverUrl: string = '';  // 不变
-     @Param title: string = '';           // 可能变，保持同步
-     @Param price: number = 0;            // 可能变
-     @Event onItemClick: (id: string) => void;
-   }
-   ```
+1. 定义 `GroupBuyModel`、`GroupMemberModel`、`GroupBuyViewModel`。
+2. App 启动或进入拼团页时请求服务端时间，计算 `offset = serverTime - localTime`。
+3. 倒计时使用 `serverEndTime - (Date.now() + offset)`。
+4. 页面进入后台后停止无意义 UI tick，回到前台重新校准时间和状态。
+5. 拼团状态覆盖：待成团、成功、失败、已过期。
+6. 参团人数变化时触发提示或动画。
+7. 活动过期、库存不足、人数不足时有明确 UI 兜底。
 
-3. **对比实验**：同一列表项加不加 `@ReusableV2` 的帧率差异（DevEco Profiler 观测）
-4. **刻意练习 `@Once`**：哪些字段用 `@Once`？哪些保持 `@Param` 同步？判断依据是什么？
-5. **刻意练习 `freezeWhenInactive`**：Tab 切走时冻结不可见页面，回来时解冻
-6. 图片渐进式加载：先展示缩略图/模糊图，原图加载完成后替换
-7. 页面预拉：列表滑动时预取商品详情数据到内存 Map，点击时秒开（思考：什么时候触发预拉最合适？滑到第几项开始？）
-8. 拼团邀请页：生成邀请海报（`QRCode` + 文字组合）+ 复制口令到剪贴板 + 调用系统分享面板
-9. 首页多接口请求合并为一个批量请求
+### V1/V2 对照思考
 
-### V1→V2 对照思考
-- V1 `@Reusable` 的 `aboutToReuse` **有入参**，V2 `@ReusableV2` 的 `aboutToReuse` **无入参**。V2 怎么解决复用时的数据刷入问题？这背后体现了什么设计思路？
-- `@ReusableV2` 样式**默认隔离**，V1 样式**默认继承**——有什么区别？实际开发中哪个更容易出问题？
+- 倒计时剩余秒数应该存在组件内还是 ViewModel 中？
+- `@Monitor('groupBuy.status')` 和手动在请求成功后判断状态，分别适合什么场景？
+- `Date.now()` 为什么不能直接作为活动真实时间？
 
 ### 自查清单
-- [ ] `@ReusableV2` 组件复用时，`@Local` 的值会重置吗？`@Param @Once` 呢？
-- [ ] `aboutToRecycle` 和 `aboutToDisappear` 的区别是什么？各适合释放什么资源？
-- [ ] `freezeWhenInactive` 冻结的是什么？和直接 `if` 隐藏有什么区别？
-- [ ] `WaterFlow` 的 `columnsTemplate` 和 `columnsGap` 怎么配置？Item 高度不一怎么处理？
-- [ ] 瀑布流滑到第几项开始预加载下一页？为什么是这个数字？
-- [ ] 图片缓存的 Key 应该怎么设计？URL 直接当 Key 有什么问题？
-- [ ] `@StorageLink` 和 `@Provider` 的区别是什么？什么时候用哪个？
+
+- [ ] 后台 10 秒再回来，倒计时是否仍然准确？
+- [ ] 服务端时间 offset 什么时候重新校准？
+- [ ] 活动过期时按钮、价格、文案是否同步变化？
+- [ ] 拼团状态变化是否有唯一数据源？
 
 ---
 
-## 第五阶段：游戏化运营（2-3 周）
+## 阶段 5：推荐流 + 图片 + 列表性能（2 周）
 
 ### 学习目标
-掌握 `@ObservedV2` 深嵌套游戏状态、`@Monitor` 触发动画、Canvas 绘制、`@Type` 序列化、本地通知。
 
-### V2 知识点
-
-| 知识点                     | 说明                                                         |
-| -------------------------- | ------------------------------------------------------------ |
-| `@ObservedV2` 深嵌套       | 果树 → 阶段 → 所需水滴，属性级精准观测                         |
-| `@Computed`                | 计算成熟度百分比、是否可收获                                   |
-| `@Monitor` 触发动画        | 监听阶段变化 → 触发对应动画                                    |
-| `@Type`                    | 配合 `PersistenceV2`，标记类属性类型用于序列化/反序列化<br>避免序列化时类信息丢失 |
+掌握电商首页/推荐流高频能力：瀑布流、分页、图片加载、列表复用、骨架屏、性能分析。
 
 ### 鸿蒙知识点
 
-| 知识点         | 说明                                   |
-| -------------- | -------------------------------------- |
-| 属性动画       | `animateTo` 显式动画                   |
-| 隐式动画       | `.animation()` 属性动画                 |
-| Canvas 绘制    | `Canvas` 组件绘制果树、进度等            |
-| 振动反馈       | `@ohos.vibrator`                        |
-| 本地通知       | `@ohos.notification` 拼团成功/果实成熟通知 |
-| 关系型数据库   | `@ohos.data.relationalStore`（RDB）     |
-| 音效           | `@ohos.multimedia.audio` 短音效播放      |
-
-### 前置阅读
-- **动画**：`animateTo`、属性动画、`TransitionEffect`
-- **Canvas 组件** 文档
-- **@ohos.notification** 文档
-- **@ohos.data.relationalStore** 文档
-- **@Type** 文档
+| 知识点 | 说明 |
+| --- | --- |
+| `WaterFlow` | 双列瀑布流 |
+| `Refresh` | 下拉刷新 |
+| `List.onReachEnd` / 滚动触底 | 加载更多 |
+| `@ReusableV2` | 长列表组件复用，API 18+ |
+| `@Once` | 列表项稳定字段首次初始化 |
+| `freezeWhenInactive` | Tab 切走后冻结不可见页面 |
+| DevEco Profiler | 帧率、CPU、内存观察 |
 
 ### 练手任务
-1. 多多果园简化版：Canvas 绘制一棵树 + 浇水按钮 + 进度条 + 浇水动画
-2. **重点：`@ObservedV2` 深嵌套游戏状态**
 
-   ```typescript
-   @ObservedV2
-   class TreeStage {
-     @Trace name: string = '种子';      // 种子→幼苗→开花→结果
-     @Trace iconIndex: number = 0;
-     @Trace waterNeeded: number = 100;
-   }
+1. 推荐流支持刷新、加载更多、分页失败重试。
+2. 分页数据去重，处理重复商品和乱序返回。
+3. 图片加载支持占位、失败图、缓存策略。
+4. 对比 `ForEach`、`Repeat`、`@ReusableV2` 在长列表下的表现。
+5. Tab 切走时冻结不可见页面，回来时校验数据是否过期。
+6. 输出一次优化前后页面打开耗时和滚动流畅度对比。
 
-   @ObservedV2
-   class OrchardState {
-     @Trace currentWater: number = 0;
-     @Trace @Type(TreeStage)
-     stage: TreeStage = new TreeStage();
-     @Trace tasks: Task[] = [];
-   }
-   ```
+### V1/V2 对照思考
 
-   验证：直接修改 `orchard.stage.name = '幼苗'` 能否触发 UI 更新？
-
-3. **刻意练习 `@Computed` 游戏派生状态**
-
-   ```typescript
-   @Computed
-   get progressPercent(): number {
-     return this.orchard.currentWater / this.orchard.stage.waterNeeded * 100;
-   }
-   @Computed
-   get isHarvestable(): boolean {
-     return this.orchard.stage.name === '结果' && this.progressPercent >= 100;
-   }
-   ```
-
-4. **刻意练习 `@Monitor` 触发动画**
-
-   ```typescript
-   @Monitor('orchard.stage.name')
-   onStageChange(monitor: IMonitor) {
-     const prev = monitor.value()?.before;
-     const curr = monitor.value()?.now;
-     if (prev === '开花' && curr === '结果') {
-       // 触发结果动画 / 粒子效果
-     }
-   }
-   ```
-
-5. 任务列表：每日签到、浏览商品 N 秒、分享拼团等任务获取水滴
-6. 果树状态通过 `@Type` + `PersistenceV2` 持久化到 `relationalStore`，App 杀进程后恢复
-7. 定时通知：果实成熟时发本地通知
-8. 砍价简化版：动画进度条从 100% 逐步减少，展示好友砍价记录列表，带入场动画
-
-### V1→V2 对照思考
-- `@Type` 的作用是什么？如果不加 `@Type`，序列化再反序列化后 `@ObservedV2` 类会丢失什么？
-- `@Monitor` 监控 `'orchard.stage.name'` 和 `'orchard.stage'` 的触发范围有什么不同？哪个更高效？
+- `@Reusable` 和 `@ReusableV2` 生命周期差异是什么？
+- 哪些字段适合 `@Once`，哪些字段必须保持 `@Param` 同步？
+- 列表项复用时，哪些状态必须重置？
 
 ### 自查清单
-- [ ] `animateTo` 和 `.animation()` 的调用时机有什么区别？
-- [ ] Canvas 坐标系是怎样的？如何绘制曲线/圆弧？
-- [ ] `relationalStore` 和 `preferences` 的适用场景分别是什么？
-- [ ] 本地通知需要什么权限？用户关闭通知权限后怎么兜底？
-- [ ] `@Monitor` 监控 `'orchard.stage.name'` 和 `'orchard.stage'` 的触发范围有什么不同？
+
+- [ ] 加载更多失败是否能重试？
+- [ ] 重复商品是否被去重？
+- [ ] 图片失败是否有兜底？
+- [ ] 长列表滚动是否有明显卡顿？
+- [ ] 复用列表项是否出现状态串项？
 
 ---
 
-## 第六阶段：收尾整合 + V1/V2 迁移认知（1-2 周）
+## 阶段 6：工程化 + 测试 + 稳定性（1 周）
 
 ### 学习目标
-性能分析、`@ReusableV2` + `Repeat` 虚拟列表、响应式布局、V1/V2 混用规则、迁移策略。
 
-### V2 知识点
-
-| 知识点           | 说明                                   |
-| ---------------- | -------------------------------------- |
-| V1/V2 混用规则   | 父 V2 可含 V1/V2 子组件；父 V1 可含 V1/V2 子组件<br>`@ReusableV2` 子组件**只能被 V2 父组件使用** |
-| `Repeat` 虚拟列表 | 与 `@ReusableV2` 配合，超长列表性能优化  |
+补齐真实客户端工程能力：测试、Mock、日志、性能 Trace、崩溃观察、模块化认知。
 
 ### 鸿蒙知识点
 
-| 知识点         | 说明                                   |
-| -------------- | -------------------------------------- |
-| 性能打点       | `hiTraceMeter` 追踪耗时                 |
-| 内存分析       | DevEco Studio Profiler（Memory / CPU）  |
-| 帧率监控       | 开发者选项 GPU 呈现模式                 |
-| 代码混淆       | HAP 编译混淆配置                        |
-| 响应式布局     | `@ohos.mediaquery` 断点系统适配平板     |
-
-### 前置阅读
-- **hiTraceMeter** 文档
-- DevEco Studio 性能分析工具文档
-- **响应式布局** 文档
-- **V1/V2 混用** 官方说明
+| 知识点 | 说明 |
+| --- | --- |
+| Hypium / Hamock | 单元测试和 Mock |
+| `hiTraceMeter` | 耗时 Trace |
+| `hilog` | 日志规范 |
+| HiAppEvent | 崩溃和应用事件观察 |
+| HAR / HSP / HAP | 模块化认知 |
+| 混淆配置 | Release 基础配置了解 |
 
 ### 练手任务
-1. 给项目加启动耗时打点（各个生命周期节点），输出完整链路报告
-2. DevEco Profiler 跑一遍所有页面，找内存泄漏点和过度渲染
-3. 整体走查：哪些场景该用 `@Once`？哪些该加 `freezeWhenInactive`？哪些可以加骨架屏？哪些可以预拉？——自己列清单，逐项改进
-4. 简单适配平板横屏布局（媒体查询）
-5. **V1/V2 混合项目认知**：新建一个测试页，故意同时使用 `@Component` 和 `@ComponentV2`，观察编译器的警告/报错。理解混用规则表
-6. 对比优化前后的启动耗时和页面打开耗时，形成一份小结
-7. 如果让你维护一个 V1 老项目，你会从哪个装饰器开始逐步迁移到 V2？写一份迁移策略
+
+1. 给 `CartViewModel` 写价格计算、全选、删除已选测试。
+2. 给倒计时计算写服务端 offset 测试。
+3. 给 Token 刷新队列写并发 401 测试或手动验证脚本。
+4. 给关键业务事件统一日志 tag。
+5. 用 `hiTraceMeter` 或 `PerfTracker` 记录启动、页面打开、接口耗时。
+6. 人为制造一次崩溃，观察 HiAppEvent / HiLog 输出。
+7. 写一页《模块职责说明》，说明当前为什么暂不拆 HAR/HSP。
 
 ### 自查清单
-- [ ] 为什么 `@ReusableV2` 限定只能 V2 父组件使用？
-- [ ] 启动耗时中，哪些可以并行，哪些必须串行？
-- [ ] 鸿蒙的响应式布局和 Android 的有什么区别？
-- [ ] 能画一张图说明"一个 V2 组件的完整生命周期 + 各装饰器作用时机"吗？
-- [ ] 如果让你维护一个 V1 老项目，迁移策略是什么？
+
+- [ ] ViewModel 核心逻辑是否能脱离 UI 验证？
+- [ ] Mock 能否覆盖失败、空数据、弱网？
+- [ ] 日志是否能辅助定位问题？
+- [ ] 性能数据是否有优化前后对比？
+- [ ] 是否理解 HAR/HSP/HAP 的基本区别？
+
+---
+
+## 阶段 7：可选扩展：果园、砍价、分享（3-5 天）
+
+### 学习目标
+
+把运营玩法作为补充实验，而不是主线工程目标。
+
+### 可选任务
+
+1. 多多果园简化版：Canvas 绘制树、浇水进度、阶段变化。
+2. 砍价简化版：进度条、好友记录、动画反馈。
+3. 分享：复制口令、系统分享、二维码。
+4. 小组件了解：桌面展示拼团倒计时或活动入口。
+
+### 控制范围
+
+- 不占用主线时间。
+- 不追求完整业务闭环。
+- 只用于学习 Canvas、动画、分享、本地通知等鸿蒙能力。
 
 ---
 
 ## 各阶段性能 Pass 速查
 
-| 阶段     | 完成功能后追加的性能优化                                       |
-| -------- | ------------------------------------------------------------ |
-| 第一阶段 | 启动耗时打点埋点框架搭建 + SDK 延迟初始化（InitScheduler）      |
-| 第二阶段 | 冷启动链路完整打点 + InitScheduler 生效验证                    |
-| 第三阶段 | 页面预拉数据（详情页秒开） + 骨架屏 + 倒计时精度测试            |
-| 第四阶段 | `@ReusableV2` 列表复用 + 图片三级缓存 + 分页预拉 + `freezeWhenInactive` |
-| 第五阶段 | 动画帧率监控 + 内存泄漏检测（游戏状态持久化的引用管理）          |
-| 第六阶段 | 全量性能 Review + 优化前后对比 + 跑分                          |
+| 阶段 | 性能和质量补充 |
+| --- | --- |
+| 阶段 0 | 修复状态更新不可靠点，建立可运行基线 |
+| 阶段 1 | 首页首次展示耗时打点 |
+| 阶段 2 | 接口耗时、错误率、401 队列日志 |
+| 阶段 3 | 购物车操作响应速度、派生状态一致性 |
+| 阶段 4 | 倒计时精度、前后台恢复准确性 |
+| 阶段 5 | 推荐流滚动流畅度、图片加载、分页耗时 |
+| 阶段 6 | 单测、Mock、崩溃观察、Trace 报告 |
+| 阶段 7 | 动画帧率和内存观察 |
 
 ---
 
-## 性能基础设施清单（第一阶段搭建）
+## 基础设施清单
 
-| 基础设施        | 用途                             | 对应 V2/鸿蒙能力               |
-| --------------- | -------------------------------- | ----------------------------- |
-| `PerfTracker`   | 启动/页面/接口耗时打点            | `hiTraceMeter` + `hilog`       |
-| `ImageLoader`   | 图片三级缓存（内存→磁盘→网络）     | `Image` 组件 + 自定义缓存策略    |
-| `CacheManager`  | 接口缓存策略框架                  | 按需设计（memory/disk/preferences） |
-| `PreloadManager`| 页面预拉 + 接口预取               | 内存 Map + `onVisibleAreaChange` |
-| `InitScheduler` | SDK 分批延迟初始化                | 首帧前 → 首帧后空闲 → 按需      |
+| 基础设施 | 用途 | 阶段 |
+| --- | --- | --- |
+| `PerfTracker` | 启动、页面、接口耗时打点 | 阶段 1 起 |
+| `RequestState<T>` | 页面 loading / success / empty / error | 阶段 2 |
+| `HttpClient` | 统一网络请求、错误处理 | 阶段 2 |
+| `AuthService` / `TokenStore` | 登录态和 Token 管理 | 阶段 2 |
+| `CartService` | 购物车本地数据和后续持久化入口 | 阶段 3 |
+| `TimeService` | 服务端时间校准 | 阶段 4 |
+| `ImageLoader` | 图片占位、失败、缓存策略 | 阶段 5 |
+| `MockConfig` | 成功、失败、空数据、弱网模拟 | 阶段 2 起 |
 
 ---
 
 ## V1 vs V2 核心差异总览
 
-| 维度             | V1                                        | V2                                                    |
-| ---------------- | ----------------------------------------- | ----------------------------------------------------- |
-| 观测粒度         | 组件级（@ObjectLink 必须拆子组件）         | 属性级（@Trace 精准到字段）                            |
-| 对象观测         | @Observed + @ObjectLink                    | @ObservedV2 + @Trace                                  |
-| 父子双向同步     | @Link                                     | @Param + @Event（更显式）                              |
-| 计算属性         | 无（只能手写 getter 每次都算）             | @Computed（自动缓存，依赖不变不重算）                   |
-| 状态监听         | @Watch（仅一层，无变化前后值）             | @Monitor（深层监听，有变化前后值）                      |
-| 跨层级共享       | @Provide/@Consume                         | @Provider/@Consumer（@Consumer 必须本地初始化默认值）   |
-| 组件复用         | @Reusable（aboutToReuse 有入参，样式默认继承） | @ReusableV2（aboutToReuse 无入参，样式默认隔离，API 18+） |
-| 组件冻结         | 无                                        | freezeWhenInactive                                    |
-| 仅初始化一次     | 无                                        | @Once                                                 |
-| 序列化类型标记   | 无                                        | @Type                                                 |
+| 维度 | V1 | V2 | 工程判断 |
+| --- | --- | --- | --- |
+| 组件内部状态 | `@State` | `@Local` | V2 更强调状态来源清晰 |
+| 父子传参 | `@Prop` 深拷贝 | `@Param` 引用 | V2 要避免子组件隐式改父数据 |
+| 双向同步 | `@Link` | `@Param + @Event` | V2 更显式，适合 MVVM |
+| 对象观测 | `@Observed + @ObjectLink` | `@ObservedV2 + @Trace` | V2 属性级观测更细 |
+| 派生计算 | 手写 getter | `@Computed` | 深层数组不要迷信 `@Computed` |
+| 状态监听 | `@Watch` | `@Monitor` | 适合副作用，不替代状态源 |
+| 跨层共享 | `@Provide/@Consume` | `@Provider/@Consumer` | 谨慎使用，避免隐式依赖 |
+| 组件复用 | `@Reusable` | `@ReusableV2` | 需要 API 18+ 和真实列表验证 |
+| 冻结不可见组件 | 无 | `freezeWhenInactive` | 适合 Tab 和复杂页面 |
+| 序列化类型 | 无 | `@Type` | 嵌套持久化时使用 |
 
 ---
 
 ## 关键提醒
 
-1. **V2 当前为试用版**（华为官方标注），生产项目需评估稳定性。但作为学习者，从 V2 切入理解设计理念，回头再看 V1 会觉得更简单。
-2. **V1 和 V2 的根本区别**：V1 是"组件级观测"，V2 是"属性级观测"。这直接影响了组件粒度的设计方式。
-3. **`@ReusableV2` 需要 API 18+**，检查 DevEco Studio 和模拟器版本是否满足。
-4. **每阶段产出可运行的 HAP**，不要光写不跑。第一天就要确保 DevEco Studio + 模拟器/真机环境 OK。
-5. **Mock 数据优先**，先不纠结后端，用本地 JSON 把 UI 和交互跑通。
-6. **关注鸿蒙特有 API**：分布式能力、元服务卡片（桌面小组件展示拼团倒计时），这些在面试或工作中会是加分项。
+1. 当前最重要的不是继续扩页面，而是把 MVVM 数据流、购物车状态和请求状态打稳。
+2. `ComponentV2` 是学习主线，但真实项目可能大量存在 V1，必须保留迁移和降级意识。
+3. Mock 数据优先，先把 UI、状态和异常跑通，再接真实接口。
+4. 每个页面必须至少有 loading、empty、error、success。
+5. 每个核心业务状态都要能回答：数据源在哪里？谁能修改？失败如何回滚？如何复现问题？
+6. 踩坑记录继续保留，这是你后续面试、入职、复盘最有价值的材料。
 
 ---
 
 ## 进度标记
 
-| 阶段   | 主题                   | 周期     | 状态      | 完成日期 | 备注 |
-| ------ | ---------------------- | -------- | --------- | -------- | ---- |
-| 第一阶段 | 项目骨架 + MVVM + V2   | 2 周     | ⏳ 待开始 | —        |      |
-| 第二阶段 | 登录态体系             | 1.5-2 周 | ⏳ 待开始 | —        |      |
-| 第三阶段 | 拼团核心 + 时间一致性   | 2.5-3 周 | ⏳ 待开始 | —        |      |
-| 第四阶段 | 推荐流 + 社交裂变       | 2-3 周   | ⏳ 待开始 | —        |      |
-| 第五阶段 | 游戏化运营             | 2-3 周   | ⏳ 待开始 | —        |      |
-| 第六阶段 | 收尾整合 + 迁移认知     | 1-2 周   | ⏳ 待开始 | —        |      |
+| 阶段 | 主题 | 周期 | 状态 | 完成日期 | 备注 |
+| --- | --- | --- | --- | --- | --- |
+| 阶段 0 | 当前代码修正 + MVVM 重构基线 | 2-3 天 | 进行中 | - | 见 `MVVM_REFACTOR_PLAN.md` |
+| 阶段 1 | 项目骨架 + ArkUI + Navigation + MVVM | 1.5 周 | 待开始 | - | |
+| 阶段 2 | 网络层 + 请求状态 + 登录态 | 1.5 周 | 待开始 | - | |
+| 阶段 3 | 商品详情 + SKU + 购物车复杂业务态 | 2 周 | 待开始 | - | |
+| 阶段 4 | 拼团核心 + 时间一致性 | 1.5-2 周 | 待开始 | - | |
+| 阶段 5 | 推荐流 + 图片 + 列表性能 | 2 周 | 待开始 | - | |
+| 阶段 6 | 工程化 + 测试 + 稳定性 | 1 周 | 待开始 | - | |
+| 阶段 7 | 可选扩展：果园、砍价、分享 | 3-5 天 | 待开始 | - | |
 
 ---
 
@@ -724,13 +658,13 @@
 
 ### 踩坑列表
 
-| 序号 | 日期       | 问题                           | 标签              | 阶段 |
-| ---- | ---------- | ------------------------------ | ----------------- | ---- |
-| 1    | 2026-05-02 | ForEach key 相同导致只渲染一项  | ForEach;KeyGenerator | 1    |
-| 2    | 2026-05-02 | Button 小尺寸文字不可见         | Button;样式           | 1    |
-| 3    | 2026-05-03 | Checkbox 闪烁 + 全选无效        | 状态管理;@Computed;Checkbox | 1    |
-| 4    | 2026-05-03 | Text 在 TabContent+Stack 中对 @Param 不响应 | Text;@Param;TabContent;渲染缺陷 | 1    |
-| 5    | 2026-05-04 | 布局约束未解时 V2 跳过组件内容更新 | layoutWeight;SpaceBetween;内容跳过 | 1    |
+| 序号 | 日期 | 问题 | 标签 | 阶段 |
+| --- | --- | --- | --- | --- |
+| 1 | 2026-05-02 | ForEach key 相同导致只渲染一项 | ForEach;KeyGenerator | 1 |
+| 2 | 2026-05-02 | Button 小尺寸文字不可见 | Button;样式 | 1 |
+| 3 | 2026-05-03 | Checkbox 闪烁 + 全选无效 | 状态管理;@Computed;Checkbox | 1 |
+| 4 | 2026-05-03 | Text 在 TabContent+Stack 中对 @Param 不响应 | Text;@Param;TabContent;渲染缺陷 | 1 |
+| 5 | 2026-05-04 | 布局约束未解时 V2 跳过组件内容更新 | layoutWeight;SpaceBetween;内容跳过 | 1 |
 
 ---
 
@@ -746,4 +680,4 @@ V2 中 `SpaceBetween` 布局需要先确定各子元素宽度再分配间距。�
 
 **标签**：#layoutWeight #SpaceBetween #布局约束冲突
 
-> 最后更新：2026-04-28
+> 最后更新：2026-05-10

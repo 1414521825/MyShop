@@ -1,9 +1,9 @@
-import { CartItem } from "../../models/Goods/CartItem"
+import { CartItemViewModel } from "../../viewmodels/Cart/CartItemViewModel";
 
 @ComponentV2
 export struct CartListItemView {
   @Require @Param
-  cartItem: CartItem;
+  cartItem: CartItemViewModel;
 
   @Consumer('countChange')
   countChange: (id: string, op: string) => void = () => {
@@ -38,6 +38,7 @@ export struct CartListItemView {
               .fontColor('rgba(0,0,0,0.9)')
               .fontSize(16)
               .fontWeight(500)
+              .maxLines(1)
 
             Text('旅行')
               .height(16)

@@ -1,20 +1,15 @@
 @ObservedV2
-export class GoodsItem {
+export class GoodsItemViewModel {
   // 商品唯一ID
-  @Trace
-  id: string;
+  @Trace id: string;
   // 商品名称
-  @Trace
-  goodsName: string;
+  @Trace goodsName: string;
   // 商品价格
-  @Trace
-  goodsPrice: number;
+  @Trace goodsPrice: number;
   // 商品描述
-  @Trace
-  goodsDesc: string;
+  @Trace goodsDesc: string;
   // 商品图片
-  @Trace
-  goodsImage: string;
+  @Trace goodsImage: string;
 
   constructor(id: string, goodsName: string, goodsPrice: number, goodsDesc: string, goodsImage: string = "app.media.p1") {
     this.id = id;

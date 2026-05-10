@@ -1,11 +1,11 @@
-import { GoodsItem } from '../models/Goods/GoodsItem';
+import { GoodsItemViewModel } from "../viewmodels/Goods/GoodsItemViewModel";
 
 @ComponentV2
 struct GoodsListItem {
   @Require @Param
-  goodsItem: GoodsItem;
+  goodsItem: GoodsItemViewModel;
   @Event
-  onItemClick: (item: GoodsItem) => void;
+  onItemClick: (item: GoodsItemViewModel) => void;
 
   build() {
     Column() {
