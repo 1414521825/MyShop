@@ -1,38 +1,110 @@
 import http from "@ohos.net.http";
 
-export class HttpClient {
-  private baseUrl: string = ''; // Mocl阶段为空
+export class HttpRequestHeaders {
+  contentType: string = 'application/json';
+  authorization: string = '';
+  traceId: string = '';
 
-  async get(path: string): Promise<Object> {
-    let httpRequest = http.createHttp();
+  constructor(contentType: string = 'application/json', authorization: string = '', traceId: string = '') {
+    this.contentType = contentType;
+    this.authorization = authorization;
+    this.traceId = traceId;
+  }
+}
+
+class HttpHeaderObject {
+  contentType: string = 'application/json';
+  authorization: string = '';
+  traceId: string = '';
+
+  constructor(contentType: string, authorization: string, traceId: string) {
+    this.contentType = contentType;
+    this.authorization = authorization;
+    this.traceId = traceId;
+  }
+}
+
+export class HttpError extends Error {
+  statusCode: number;
+  rawResult: string;
+
+  constructor(message: string, statusCode: number = -1, rawResult: string = '') {
+    super(message);
+    this.statusCode = statusCode;
+    this.rawResult = rawResult;
+  }
+}
+
+export class HttpClient {
+  private baseUrl: string = ''; // Mock阶段为空
+
+  async get<T>(path: string, headers?: HttpRequestHeaders): Promise<T> {
+    return this.request<T>(path, http.RequestMethod.GET, undefined, headers);
+  }
+
+  async post<T>(path: string, body: Object, headers?: HttpRequestHeaders): Promise<T> {
+    return this.request<T>(path, http.RequestMethod.POST, body, headers);
+  }
+
+  private async request<T>(
+    path: string,
+    method: http.RequestMethod,
+    body?: Object,
+    headers?: HttpRequestHeaders
+  ): Promise<T> {
+    const httpRequest = http.createHttp();
+
     try {
       const response = await httpRequest.request(
         this.baseUrl + path,
         {
-          method: http.RequestMethod.GET
+          method: method,
+          extraData: body === undefined ? undefined : JSON.stringify(body),
+          header: this.buildHeaders(headers),
+          connectTimeout: 10000,
+          readTimeout: 10000
         }
       );
-      return JSON.parse(response.result as string);
+
+      const statusCode = response.responseCode;
+      const rawResult = response.result as string;
+
+      if (statusCode < 200 || statusCode >= 300) {
+        throw new HttpError('HTTP 请求失败', statusCode, rawResult);
+      }
+
+      return this.parseJson<T>(rawResult, statusCode);
+    } catch (err) {
+      if (err instanceof HttpError) {
+        throw err;
+      }
+
+      throw new HttpError('网络请求异常', -1, JSON.stringify(err));
     } finally {
       httpRequest.destroy();
     }
   }
 
-  async post(path: string, body: Object): Promise<Object> {
-    let httpRequest = http.createHttp();
+  private parseJson<T>(rawResult: string, statusCode: number): T {
     try {
-      const response = await httpRequest.request(
-        this.baseUrl + path,
-        {
-          method: http.RequestMethod.POST,
-          extraData: body,
-          header: {'Content-Type': 'application/json'}
-        }
-      );
-      return JSON.parse(response.result as string);
-    } finally {
-      httpRequest.destroy();
+      return JSON.parse(rawResult) as T;
+    } catch (err) {
+      throw new HttpError('响应数据解析失败', statusCode, rawResult);
     }
+  }
+
+  private buildHeaders(headers?: HttpRequestHeaders): HttpHeaderObject {
+    let contentType: string = 'application/json';
+    let authorization: string = '';
+    let traceId: string = '';
+
+    if (headers !== undefined) {
+      contentType = headers.contentType;
+      authorization = headers.authorization;
+      traceId = headers.traceId;
+    }
+
+    return new HttpHeaderObject(contentType, authorization, traceId);
   }
 }
 

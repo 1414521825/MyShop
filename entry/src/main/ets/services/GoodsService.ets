@@ -1,11 +1,35 @@
 import { GoodsItemModel } from '../models/Goods/GoodsItemModel';
+import { RequestState } from '../viewmodels/common/RequestState';
 import { httpClient } from './HttpClient';
 
+type GoodsMockMode = 'success' | 'empty' | 'error' | 'delay';
+
 export  class GoodsService {
+  private mockMode: GoodsMockMode = 'success';
   httpClient = httpClient;
 
+  setMockMode(mode: GoodsMockMode): void {
+    this.mockMode = mode;
+  }
+
   async getGoodsList(): Promise<GoodsItemModel[]> {
-    // TODO: 切真实接口 → return httpClient.get('/api/goods')
+    if (this.mockMode === 'delay') {
+      await this.sleep(1500);
+      return this.getMockGoodsList();
+    }
+
+    if (this.mockMode === 'empty') {
+      return [];
+    }
+
+    if (this.mockMode === 'error') {
+      throw new Error('商品列表加载失败');
+    }
+
+    return this.getMockGoodsList();
+  }
+
+  getMockGoodsList(): GoodsItemModel[] {
     return [
       new GoodsItemModel('1', '苹果 iPhone 15 Pro Max 256GB', 7999, 'A17 Pro 芯片 | 钛金属', 'app.media.p1'),
       new GoodsItemModel('2', '华为 Mate 60 Pro', 6999, '麒麟 9000S | 卫星通话', 'app.media.p2'),
@@ -18,6 +42,14 @@ export  class GoodsService {
       new GoodsItemModel('9', '三只松鼠巨型零食大礼包', 139, '30袋装 | 追剧必备', 'app.media.p5'),
       new GoodsItemModel('10', '科沃斯 T30 扫地机器人', 3499, '自动集尘 | 热水洗拖布', 'app.media.p4'),
     ];
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, ms);
+    });
   }
 }
 

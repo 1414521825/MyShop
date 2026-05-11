@@ -1,3 +1,5 @@
+import { GoodsItemModel } from "../../models/Goods/GoodsItemModel";
+
 @ObservedV2
 export class GoodsItemViewModel {
   // 商品唯一ID
@@ -17,5 +19,15 @@ export class GoodsItemViewModel {
     this.goodsPrice = goodsPrice;
     this.goodsDesc = goodsDesc;
     this.goodsImage = goodsImage;
+  }
+
+  static fromModel(model: GoodsItemModel): GoodsItemViewModel {
+    return new GoodsItemViewModel(
+      model.id,
+      model.goodsName,
+      model.goodsPrice,
+      model.goodsDesc,
+      model.goodsImage
+    );
   }
 }

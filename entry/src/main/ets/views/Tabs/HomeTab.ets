@@ -19,22 +19,36 @@ export struct HomeTab {
 
   build() {
     Column() {
-      WaterFlow() {
-        ForEach(this.goodsListViewModel.goodsList, (item: GoodsItemViewModel) => {
-          FlowItem() {
-            GoodsListItem({goodsItem: item, onItemClick: (goodsItem) => {
-              this.selectedItem = goodsItem;
-              this.selectedCount = 1;
-            }})
-          }
-          .margin(2)
-        }, (item: GoodsItemViewModel) => item.id)
+      if (this.goodsListViewModel.goodsListState.status === 'loading') {
+        Text('加载中....')
       }
-      .columnsTemplate('1fr 1fr')
-      // .columnsGap(4)
-      // .rowsGap(8)
-      .layoutWeight(1)
-
+      else if (this.goodsListViewModel.goodsListState.status === 'empty') {
+        Text('暂无商品')
+      }
+      else if (this.goodsListViewModel.goodsListState.status === 'error') {
+        Text(this.goodsListViewModel.goodsListState.errorMessage)
+        Button('重试')
+          .onClick(() => {
+            this.goodsListViewModel.loadGoodsList();
+          })
+      }
+      else {
+        WaterFlow() {
+          ForEach(this.goodsListViewModel.goodsList, (item: GoodsItemViewModel) => {
+            FlowItem() {
+              GoodsListItem({goodsItem: item, onItemClick: (goodsItem) => {
+                this.selectedItem = goodsItem;
+                this.selectedCount = 1;
+              }})
+            }
+            .margin(2)
+          }, (item: GoodsItemViewModel) => item.id)
+        }
+        .columnsTemplate('1fr 1fr')
+        // .columnsGap(4)
+        // .rowsGap(8)
+        .layoutWeight(1)
+      }
       // 商品详情（底部弹出）
       if (this.selectedItem !== null) {
         GoodsDetailCard({
