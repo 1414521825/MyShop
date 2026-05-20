@@ -1,4 +1,5 @@
 import http from "@ohos.net.http";
+import { tokenStore } from "./TokenStore";
 
 export class HttpRequestHeaders {
   contentType: string = 'application/json';
@@ -69,6 +70,11 @@ export class HttpClient {
       const statusCode = response.responseCode;
       const rawResult = response.result as string;
 
+      if (statusCode === 401) {
+        tokenStore.clearToken();
+        throw new HttpError('登录已失效，请重新登录', statusCode, rawResult);
+      }
+
       if (statusCode < 200 || statusCode >= 300) {
         throw new HttpError('HTTP 请求失败', statusCode, rawResult);
       }
@@ -103,6 +109,15 @@ export class HttpClient {
       authorization = headers.authorization;
       traceId = headers.traceId;
     }
+
+    if (authorization.length === 0) {
+      const token: string = tokenStore.getAccessToken();
+      if (token.length > 0) {
+        // Bearer 代表认证类型
+        authorization = `Bearer ${token}`;
+      }
+    }
+    console.info(`[HttpClient] hasAuthorization=${authorization.length > 0}`);
 
     return new HttpHeaderObject(contentType, authorization, traceId);
   }

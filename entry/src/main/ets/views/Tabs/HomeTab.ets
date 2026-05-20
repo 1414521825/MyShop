@@ -1,6 +1,6 @@
 import { cartViewModel } from '../../viewmodels/Cart/CartViewModel';
 import { GoodsItemViewModel } from '../../viewmodels/Goods/GoodsItemViewModel';
-import { GoodsListViewModel } from '../../viewmodels/Goods/GoodsListViewModel'
+import { GoodsListViewModel } from '../../viewmodels/Goods/GoodsListViewModel';
 import { GoodsDetailCard } from '../GoodsDetailCard';
 import GoodsListItem from '../GoodsListItem';
 
@@ -12,9 +12,30 @@ export struct HomeTab {
   selectedItem: GoodsItemViewModel | null = null;
   @Local
   selectedCount: number = 0;
+  @Consumer('pageStack')
+  pageStack: NavPathStack = new NavPathStack();
+  private isJumpingLogin: boolean = false;
 
   aboutToAppear(): void {
-    this.goodsListViewModel.loadGoodsList();
+    this.isJumpingLogin = false;
+    this.loadGoodsList();
+  }
+
+  private async loadGoodsList(): Promise<void> {
+    await this.goodsListViewModel.loadGoodsList();
+
+    if (!this.goodsListViewModel.needLogin) {
+      this.isJumpingLogin = false;
+      return;
+    }
+    if (this.isJumpingLogin) {
+      return;
+    }
+
+    this.isJumpingLogin = true;
+    this.pageStack.pushPath({
+      name: 'LoginPage'
+    });
   }
 
   build() {
@@ -29,7 +50,7 @@ export struct HomeTab {
         Text(this.goodsListViewModel.goodsListState.errorMessage)
         Button('重试')
           .onClick(() => {
-            this.goodsListViewModel.loadGoodsList();
+            this.loadGoodsList();
           })
       }
       else {

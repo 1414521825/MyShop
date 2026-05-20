@@ -42,7 +42,7 @@ export class AuthViewModel {
     }
   }
 
-  sendCode(phone: string): void {
+  async sendCode(phone: string): Promise<void> {
     if (this.codeCountdown > 0 || this.isSendingCode) {
       return;
     }
@@ -55,15 +55,29 @@ export class AuthViewModel {
     this.isSendingCode = true;
     this.errorMessage = '';
 
-    // Mock 发送验证码：真实接口接入后，这里改为 AuthService.sendCode(phone)。
-    this.isSendingCode = false;
-    this.startCodeCountdown();
+    try {
+      await authService.sendCode(phone);
+      this.startCodeCountdown();
+    } catch (err) {
+      this.errorMessage = '验证码发送失败';
+    } finally {
+      this.isSendingCode = false;
+    }
   }
 
   logout(): void {
     tokenStore.clearToken();
     this.isLoggedIn = false;
     this.errorMessage = '';
+  }
+
+  disposeCountdown(): void {
+    if (this.countdownTimer !== -1) {
+      clearInterval(this.countdownTimer);
+      this.countdownTimer = -1;
+    }
+
+    this.codeCountdown = 0;
   }
 
   private startCodeCountdown(): void {

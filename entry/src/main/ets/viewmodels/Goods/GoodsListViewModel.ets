@@ -1,5 +1,6 @@
 import { GoodsItemModel } from "../../models/Goods/GoodsItemModel";
 import { goodsService } from "../../services/GoodsService";
+import { HttpError } from "../../services/HttpClient";
 import { RequestState } from "../common/RequestState";
 import { GoodsItemViewModel } from "./GoodsItemViewModel";
 
@@ -7,8 +8,8 @@ import { GoodsItemViewModel } from "./GoodsItemViewModel";
 export class GoodsListViewModel {
   @Trace goodsListState: RequestState<GoodsItemViewModel[]> =
     new RequestState<GoodsItemViewModel[]>();
-
-  private currentPage: number = 1;
+  @Trace
+  needLogin: boolean = false;
 
   get goodsList(): GoodsItemViewModel[] {
     if (this.goodsListState.data === undefined) {
@@ -20,8 +21,8 @@ export class GoodsListViewModel {
 
   // 加载商品列表
   async loadGoodsList(): Promise<void> {
+    this.needLogin = false;
     this.goodsListState.loading();
-    this.currentPage = 1;
 
     try {
       const models: GoodsItemModel[] = await goodsService.getGoodsList();
@@ -37,6 +38,12 @@ export class GoodsListViewModel {
 
       this.goodsListState.success(goodsList);
     } catch (err) {
+      if (err instanceof HttpError && err.statusCode === 401) {
+        this.needLogin = true;
+        this.goodsListState.error('登录已失效，请重新登录');
+        return;
+      }
+
       this.goodsListState.error('商品列表加载失败');
     }
   }

@@ -31,6 +31,10 @@ export struct LoginPage {
     this.auth.restoreLoginState();
   }
 
+  aboutToDisappear(): void {
+    this.auth.disposeCountdown();
+  }
+
   @Builder
   DividerLine() {
     Divider()
